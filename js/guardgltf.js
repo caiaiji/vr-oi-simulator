@@ -17,24 +17,10 @@ const GUARD_GLTF = {
 
 /* 加载一次模型，缓存完整场景模板（含骨骼绑定） */
 function initGuardGLTF(){
-  if (typeof THREE === 'undefined' || !THREE.GLTFLoader) return;
-  const loader = new THREE.GLTFLoader();
-  loader.load('assets/models/soldier.glb', (gltf) => {
-    try {
-      if (!gltf.scene){
-        GUARD_GLTF.failed = true;
-        return;
-      }
-      GUARD_GLTF.sceneTemplate = gltf.scene;
-      GUARD_GLTF.ready = true;
-      console.log('[guardgltf] 模型就绪');
-    } catch (err){
-      console.warn('[guardgltf] 解析失败，回退方块人', err);
-      GUARD_GLTF.failed = true;
-    }
-  }, undefined, () => {
-    GUARD_GLTF.failed = true;
-  });
+  /* GLTF 模型已停用：在部分环境蒙皮渲染崩坏（只剩腿桶悬浮在场上），
+     按用户决定全部回退胶囊体拟人版建模。此函数保留仅作占位。 */
+  GUARD_GLTF.failed = true;
+  GUARD_GLTF.ready = false;
 }
 
 /* 深克隆一棵 Object3D 子树（Scene→Group / Bone / SkinnedMesh / Mesh），
@@ -220,15 +206,8 @@ function makeGLTFGuard(x, z, type, parent){
   };
 }
 
-/* 统一入口：模型就绪走 GLTF，否则回退方块人 */
+/* 统一入口：GLTF 已停用（蒙皮渲染崩坏），一律使用胶囊体拟人版建模 */
 function buildSecurityGuard(x, z, type, parent){
-  if (GUARD_GLTF.ready){
-    try {
-      return makeGLTFGuard(x, z, type, parent);
-    } catch (err){
-      console.warn('[guardgltf] 实例化失败，回退方块人', err);
-    }
-  }
   return buildSecurityGuardBox(x, z, type, parent);
 }
 
