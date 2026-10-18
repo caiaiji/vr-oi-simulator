@@ -246,7 +246,7 @@ function spawnBodyDebris(group, opt){
     mesh.position.copy(_dbPos);
     mesh.quaternion.copy(_dbQuat);
     mesh.scale.copy(_dbScl);
-    scene.add(mesh);
+    (typeof activeWorldScene === 'function' ? activeWorldScene() : scene).add(mesh);
 
     const shape = debrisShape(p.geometry, _dbScl);
     shape.quat = mesh.quaternion;      /* 刚体姿态实时引用 */
@@ -273,7 +273,7 @@ function updateDebris(dt){
     const d = debrisList[i];
     d.life -= dt;
     if (d.life <= 0){
-      scene.remove(d.mesh);
+      if (d.mesh.parent) d.mesh.parent.remove(d.mesh);
       d.mat.dispose();          /* 只销毁克隆材质，共享几何不动 */
       debrisList.splice(i, 1);
       continue;

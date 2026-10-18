@@ -110,7 +110,7 @@ function updateInteract(){
 
   /* 出口 → E */
   const dDoor = Math.hypot(state.pos.x - 7.85, state.pos.z - 0);
-  if (dDoor < 3.0){
+  if (!state.arenaMode && dDoor < 3.0){
     /* 终局：门已开，走向白光即可走出去 */
     if (state.doorOpen){
       actionE = { fn: walkOutOfTheRoom };

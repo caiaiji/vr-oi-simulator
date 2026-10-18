@@ -118,8 +118,10 @@ function updatePlayer(dt){
   const moving = _move.lengthSq() > 0;
   lastMoveSpeed = walking ? speed : (moving ? 4.6 : 0);
   if (moving){
-    const nx = clamp(state.pos.x + _move.x, -7.5, 7.5);
-    const nz = clamp(state.pos.z + _move.z, -6.5, 6.5);
+    const bnd = (typeof getWorldBounds === 'function')
+      ? getWorldBounds() : { hw: 7.5, hd: 6.5 };
+    const nx = clamp(state.pos.x + _move.x, -bnd.hw, bnd.hw);
+    const nz = clamp(state.pos.z + _move.z, -bnd.hd, bnd.hd);
     /* 分轴滑动碰撞 */
     /* 空中不碰障碍：可以翻身过桌面；落地时若卡进去会回溯到起跳点 */
     const air = !onGround;
@@ -213,10 +215,12 @@ function drawMinimap(){
   ctx.fillStyle = 'rgba(10,13,20,.85)';
   ctx.fillRect(0, 0, W, H);
 
-  /* 世界：x∈[-8,8], z∈[-7,7] */
-  const sx = W / 16, sy = H / 14;
-  const tx = x => (x + 8) * sx;
-  const ty = z => (z + 7) * sy;
+  /* 世界：教室 x∈[-8,8] z∈[-7,7]；竞技场按世界边界动态缩放 */
+  const bnd = (typeof getWorldBounds === 'function')
+    ? getWorldBounds() : { hw: 8, hd: 7 };
+  const sx = W / (bnd.hw * 2), sy = H / (bnd.hd * 2);
+  const tx = x => (x + bnd.hw) * sx;
+  const ty = z => (z + bnd.hd) * sy;
 
   /* 障碍 */
   ctx.fillStyle = '#2a3242';

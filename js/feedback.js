@@ -72,6 +72,7 @@ const ACHIEVEMENTS = {
   explorer:   { name: '厕所旅行家', desc: '完整去过一次洗手间' },
   wanderer: { name: '红圈五连', desc: '同一场考试，五次随意走动' }
   ,army: { name: '一人军队', desc: '击倒全部 200 名保安（隐藏结局）' }
+  ,arena10: { name: '斗技场常客', desc: '在竞技场撑到第 10 波' }
   ,combo15: { name: '连击宗师', desc: '单次连击达到 15' }
   ,combo30: { name: '心流之王', desc: '单次连击达到 30' }
   ,loot5:   { name: '考场拾荒者', desc: '捡起 5 件掉落补给' }

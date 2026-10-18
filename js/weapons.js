@@ -487,7 +487,7 @@ function punchThrow(w){
   mesh.position.copy(camera.position)
     .addScaledVector(dir, 0.45)
     .addScaledVector(_wvUp, -0.12);
-  scene.add(mesh);
+  (typeof activeWorldScene === 'function' ? activeWorldScene() : scene).add(mesh);
 
   const vel = dir.clone().multiplyScalar(w.throwSpeed);
   vel.y += w.throwLift;
@@ -606,7 +606,7 @@ function explodeThrowAt(p, it){
 }
 
 function clearThrows(){
-  for (const it of thrownList) scene.remove(it.mesh);
+  for (const it of thrownList) if (it.mesh.parent) it.mesh.parent.remove(it.mesh);
   thrownList.length = 0;
 }
 

@@ -218,7 +218,7 @@ function spawnSparks(x, y, z, n, color){
       new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.3 })
     );
     m.position.set(x + (Math.random() - 0.5) * 0.3, y, z + (Math.random() - 0.5) * 0.3);
-    scene.add(m);
+    (typeof activeWorldScene === 'function' ? activeWorldScene() : scene).add(m);
     const shape = boxShape(0.045, 0.045, 0.045);
     shape.quat = m.quaternion;
     debrisList.push({
@@ -296,7 +296,7 @@ function makeLootMesh(kind, x, z){
   ring.position.y = 0.02;
   g.add(ring);
 
-  scene.add(g);
+  (typeof activeWorldScene === 'function' ? activeWorldScene() : scene).add(g);
   lootList.push({ group: g, kind, t: 0, life: LOOT_LIFE, ph: Math.random() * 7 });
 }
 
@@ -312,7 +312,7 @@ function maybeDropLoot(guard, type){
 }
 
 function removeLoot(it){
-  scene.remove(it.group);
+  if (it.group.parent) it.group.parent.remove(it.group);
   const i = lootList.indexOf(it);
   if (i >= 0) lootList.splice(i, 1);
 }

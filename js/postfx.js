@@ -120,9 +120,12 @@ function resizePostFX(){
    2) three 对 Color 背景会 forceClear，即使 autoClear=false 也清屏，
       所以 UI 覆盖 pass 前要临时摘掉 scene.background。 */
 function renderFrame(dt){
+  /* 世界层二选一：教室 / 竞技场（UI 层始终渲染 scene） */
+  const worldScene = (typeof activeWorldScene === 'function')
+    ? activeWorldScene() : scene;
   if (!postOK){
     camera.layers.enable(1);
-    try { renderer.render(scene, camera); }
+    try { renderer.render(worldScene, camera); }
     finally { camera.layers.disable(1); }
     return;
   }
@@ -134,7 +137,7 @@ function renderFrame(dt){
   /* 1. 世界 → rtFrame（不含 UI 层） */
   camera.layers.disable(1);
   renderer.setRenderTarget(rtFrame);
-  renderer.render(scene, camera);
+  renderer.render(worldScene, camera);
   renderer.setRenderTarget(null);
 
   /* 2. 累积：accum = mix(rtFrame, rtAccA, damp) → rtAccB，然后交换 */

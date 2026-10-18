@@ -119,16 +119,20 @@ function killGuard(g, dmg, kb){
   g.userData.alive = false;
   /* 先炸散再移除组：部件已摘到场景里，带物理飞走 */
   spawnBodyDebris(g.group, { speed: 3.9 + kb });
-  scene.remove(g.group);
+  if (g.group.parent) g.group.parent.remove(g.group);
   state.guardKills++;
   /* 连击 / 飘字 / 掉落补给 */
   if (typeof arcadeHookKill === 'function') arcadeHookKill(g);
-  if (state.guardKills >= GUARD_MAX_TOTAL){
+  if (state.guardKills >= GUARD_MAX_TOTAL && !state.arenaMode){
     openFinalDoor();
     return false;
   }
-  /* 每倒一名补一批替补：近战 AOE / 投掷等所有击杀路径统一补员 */
-  if (typeof spawnTwoGuards === 'function'){
+  /* 竞技场不分名额、不打补员：波次推进交给 arena.js 的钩子 */
+  if (state.arenaMode && typeof arenaHookKill === 'function'){
+    arenaHookKill();
+  }
+  /* 教室：每倒一名补一批替补（近战 AOE / 投掷等所有击杀路径统一补员） */
+  if (!state.arenaMode && typeof spawnTwoGuards === 'function'){
     const dl = 900 + Math.min(state.guardKills, 3) * 130;
     setTimeout(() => {
       if (state.ended) return;
@@ -170,6 +174,11 @@ function openFinalDoor(){
 /* 真的走出白光：此时才结算 */
 function walkOutOfTheRoom(){
   if (state.ended) return;
+  /* 白光不是终点：传送进竞技场继续决斗；没有竞技场模块时退回旧结局 */
+  if (typeof enterArena === 'function'){
+    enterArena();
+    return;
+  }
   endByTotalVictory();
 }
 
@@ -304,7 +313,7 @@ function endByGuards(){
   if (state.ended) return;
   state.ended = true;
   hideAllPanels();
-  for (const g of securityGuards) scene.remove(g.group);
+  for (const g of securityGuards) if (g.group.parent) g.group.parent.remove(g.group);
   securityGuards.length = 0;
 
   audio.beep(110, 0.5, 0.08, 'sawtooth');
@@ -406,6 +415,7 @@ function checkGuardKillMilestones(k){
 }
 
 function maybeGuardWarning(){
+  if (state.arenaMode) return;   /* 竞技场没有通报处，只有下一波 */
   if (!guardWarnRoll(state.guardKills, Math.random)) return;
 
   /* 通报弹出：整个世界放慢到 0.1x（考试计时不受影响），
@@ -452,7 +462,7 @@ function endByTotalVictory(){
   if (state.ended) return;
   state.ended = true;
   hideAllPanels();
-  for (const g of securityGuards) scene.remove(g.group);
+  for (const g of securityGuards) if (g.group.parent) g.group.parent.remove(g.group);
   securityGuards.length = 0;
   unlockAch('army');
 
@@ -475,7 +485,7 @@ function hideAllPanels(){
   /* 3D 悬浮弹窗也要收场（弹窗不再是 DOM，无法用 classList 隐藏） */
   dismissDialogs();
   ['hud', 'pauseMenu', 'codeUI', 'paperUI', 'corridorUI',
-   'bathroomUI', 'npcComputerUI', 'minimapWrap', 'comboWrap', 'buffWrap', 'weaponHud', 'turnBadge']
+   'bathroomUI', 'npcComputerUI', 'minimapWrap', 'comboWrap', 'buffWrap', 'weaponHud', 'turnBadge', 'arenaHud']
     .forEach(id => { const e = $(id); if (e) e.classList.add('hidden'); });
   /* 投掷物清理 */
   if (typeof clearThrows === 'function') clearThrows();

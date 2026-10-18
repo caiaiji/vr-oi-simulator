@@ -443,11 +443,11 @@ function buildPerson(x, z, shirtColor, rotY, startPose){
            phase: Math.random() * Math.PI * 2 };
 }
 
-function buildSecurityGuard(x, z, type){
+function buildSecurityGuard(x, z, type, parent){
   type = type || 'normal';
   const g = new THREE.Group();
   g.position.set(x, 0, z);
-  scene.add(g);
+  (parent || scene).add(g);
 
   const skin = 0xd0a070;
   const pants = 0x141e30;
@@ -697,18 +697,22 @@ function spawnTwoGuards(){
     const dist = GUARD_SPAWN_DIST + Math.random() * 1.2;
     let gx = state.pos.x + Math.cos(angle) * dist;
     let gz = state.pos.z + Math.sin(angle) * dist;
-    gx = clamp(gx, -7.5, 7.5);
-    gz = clamp(gz, -6.5, 6.5);
+    /* 教室 / 竞技场边界动态取值 */
+    const bnd = (typeof getWorldBounds === 'function')
+      ? getWorldBounds() : { hw: 7.5, hd: 6.5 };
+    gx = clamp(gx, -bnd.hw, bnd.hw);
+    gz = clamp(gz, -bnd.hd, bnd.hd);
 
     let tries = 0;
     while (Math.hypot(gx - state.pos.x, gz - state.pos.z) < 3.6 && tries++ < 14){
       angle += 0.9;
-      gx = clamp(state.pos.x + Math.cos(angle) * dist, -7.5, 7.5);
-      gz = clamp(state.pos.z + Math.sin(angle) * dist, -6.5, 6.5);
+      gx = clamp(state.pos.x + Math.cos(angle) * dist, -bnd.hw, bnd.hw);
+      gz = clamp(state.pos.z + Math.sin(angle) * dist, -bnd.hd, bnd.hd);
     }
 
     const type = rollGuardType();
-    const g = buildSecurityGuard(gx, gz, type);
+    const g = buildSecurityGuard(gx, gz, type,
+      (state.arenaMode && typeof arenaScene !== 'undefined') ? arenaScene : undefined);
     /* 重装：慢但两段血；快速：快但脆 */
     let spd = GUARD_SPEED_BASE;
     if (type === 'heavy') spd = 0.42;
