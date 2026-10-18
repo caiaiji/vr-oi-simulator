@@ -39,10 +39,11 @@ function arenaWaveSize(w){
 
 /* 竞技场保安速度：随波次整体变快；fast 极快、heavy 慢但血厚 */
 function arenaGuardSpeed(w, type){
-  const waveMul = 1 + Math.min(0.55, (w - 1) * 0.07);
-  if (type === 'heavy') return 0.40 * Math.min(1.35, waveMul);
-  if (type === 'fast')  return 0.92 * Math.min(1.45, waveMul);
-  return 0.55 * waveMul;
+  /* 波次越高冲得越狠：第 10 波起全员接近玩家疾跑速度 */
+  const waveMul = 1 + Math.min(1.0, (w - 1) * 0.09);
+  if (type === 'heavy') return 0.55 * Math.min(1.5, waveMul);
+  if (type === 'fast')  return 1.45 * Math.min(1.6, waveMul);
+  return 0.95 * waveMul;
 }
 
 /* 竞技场种类掷骰：波次越高，重装 / 快速越常见 */
@@ -59,11 +60,13 @@ function arenaGuardType(){
 function spawnArenaGuards(n){
   /* 竞技场不靠补员清理死守卫，入场前主动 prune 防数组膨胀 */
   if (typeof pruneDeadGuards === 'function') pruneDeadGuards();
+  /* 以玩家当前站位为中心包抄：每一波都是包围圈，没有安全打靶位 */
+  const px = state.pos.x, pz = state.pos.z;
   for (let i = 0; i < n; i++){
     const angle = Math.random() * Math.PI * 2;
-    const dist = 7.5 + Math.random() * 3.0;
-    const gx = clamp(Math.cos(angle) * dist, -ARENA_HW + 1.2, ARENA_HW - 1.2);
-    const gz = clamp(Math.sin(angle) * dist, -ARENA_HD + 1.2, ARENA_HD - 1.2);
+    const dist = 6.5 + Math.random() * 3.0;
+    const gx = clamp(px + Math.cos(angle) * dist, -ARENA_HW + 1.2, ARENA_HW - 1.2);
+    const gz = clamp(pz + Math.sin(angle) * dist, -ARENA_HD + 1.2, ARENA_HD - 1.2);
 
     const type = (typeof arenaGuardType === 'function')
       ? arenaGuardType()

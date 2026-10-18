@@ -275,8 +275,38 @@ function updateGuards(realDt, t){
 
     if (d > 0.01){
       const sp = g.userData.speed * realDt;
-      const nx = pos.x + (dx / d) * sp;
-      const nz = pos.z + (dz / d) * sp;
+      let nx = pos.x + (dx / d) * sp;
+      let nz = pos.z + (dz / d) * sp;
+      /* 竞技场绕障：直行被挡就选定一侧坚定绕行，不顶墙罚站也不来回抖 */
+      if (state.arenaMode &&
+          (collides(nx, pos.z, 0.3) || collides(pos.x, nz, 0.3))){
+        if (!g.userData.avertT || g.userData.avertT <= 0){
+          if (g.userData.avertDir === undefined){
+            /* 首次撞墙：按挡路障碍相对玩家连线的位置选绕行侧 */
+            let side = (Math.random() < 0.5) ? 1 : -1;
+            let best = null, bestD = Infinity;
+            for (let k = 0; k < obstacles.length; k++){
+              const o = obstacles[k];
+              if (Math.abs(nx - o.x) < o.hw + 0.3 &&
+                  Math.abs(nz - o.z) < o.hd + 0.3){
+                const oD = Math.hypot(o.x - pos.x, o.z - pos.z);
+                if (oD < bestD){ best = o; bestD = oD; }
+              }
+            }
+            if (best){
+              const cross = (dx / d) * (best.z - pos.z) - (dz / d) * (best.x - pos.x);
+              if (Math.abs(cross) > 0.15 * d) side = cross > 0 ? 1 : -1;
+            }
+            g.userData.avertDir = side;
+          }
+          /* 方向已定：仍被挡就同向续期，绝不原地来回摆 */
+          g.userData.avertT = 2.5 + Math.random() * 1.2;
+        }
+        g.userData.avertT -= realDt;
+        const ang = Math.atan2(dx, dz) + g.userData.avertDir * 1.25;
+        nx = pos.x - Math.sin(ang) * sp;
+        nz = pos.z - Math.cos(ang) * sp;
+      }
       if (!collides(nx, pos.z, 0.3)) pos.x = nx;
       if (!collides(pos.x, nz, 0.3)) pos.z = nz;
       g.group.rotation.y = Math.atan2(dx, dz);
