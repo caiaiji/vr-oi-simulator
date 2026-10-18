@@ -148,11 +148,40 @@ function makeGLTFGuard(x, z, type, parent){
   const foreL = getBone('LeftForeArm');
   const foreR = getBone('RightForeArm');
 
-  /* 初始姿态：垂臂 + 微屈肘，避免 T-pose 平举手 */
-  if (armL) armL.rotation.set(-1.45, 0, -0.15);
-  if (armR) armR.rotation.set(-1.45, 0, 0.15);
-  if (foreL) foreL.rotation.set(-0.28, 0, 0);
-  if (foreR) foreR.rotation.set(-0.28, 0, 0);
+  /* 初始姿态：垂臂更贴躯干 + 微屈肘，避免 T-pose 平举手 */
+  if (armL) armL.rotation.set(-1.52, 0, -0.10);
+  if (armR) armR.rotation.set(-1.52, 0, 0.10);
+  if (foreL) foreL.rotation.set(-0.30, 0, 0.06);
+  if (foreR) foreR.rotation.set(-0.30, 0, -0.06);
+
+  /* 肩部护垫：桥接躯干与上臂的接缝，消除“手臂悬浮”的观感。
+     模型是厘米量纲（1 单位 = 1cm），垫块按比例挂在左右上臂骨上 */
+  const padMats = [new THREE.MeshStandardMaterial({
+    color: new THREE.Color(tint).multiplyScalar(0.72), roughness: 0.9, metalness: 0.05
+  })];
+  const padGeo = new THREE.CylinderGeometry(6.5, 8.5, 26, 8);
+  const capGeo = new THREE.SphereGeometry(8, 8, 5);
+  const upArmL = getBone('LeftArm'), upArmR = getBone('RightArm');
+  if (upArmL){
+    const pad = new THREE.Mesh(padGeo, padMats);
+    pad.rotation.z = Math.PI / 2;
+    pad.position.set(-4, 0, 0);
+    pad.castShadow = true;
+    upArmL.add(pad);
+    const cap = new THREE.Mesh(capGeo, padMats);
+    cap.position.set(-4, -13, 0);
+    upArmL.add(cap);
+  }
+  if (upArmR){
+    const pad = new THREE.Mesh(padGeo, padMats);
+    pad.rotation.z = Math.PI / 2;
+    pad.position.set(-4, 0, 0);
+    pad.castShadow = true;
+    upArmR.add(pad);
+    const cap = new THREE.Mesh(capGeo, padMats);
+    cap.position.set(-4, -13, 0);
+    upArmR.add(cap);
+  }
 
   /* 头顶预警灯 + 光晕：挂头骨，随头转 */
   let warnLight = null, glow = null;
