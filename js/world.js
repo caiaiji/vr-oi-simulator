@@ -443,6 +443,96 @@ function buildPerson(x, z, shirtColor, rotY, startPose){
            phase: Math.random() * Math.PI * 2 };
 }
 
+/* 保安（与同学/老师同一套 buildPerson 方块人建模，外观完全一致，
+   仅制服配色按类型区分）。骨架接口与 buildSecurityGuardBox 对齐：
+   armL/armR/legL/legR/head/body/warnLight/glow，供步态逻辑驱动。 */
+function buildPersonGuard(x, z, type, parent){
+  type = type || 'normal';
+  const g = new THREE.Group();
+  g.position.set(x, 0, z);
+  (parent || scene).add(g);
+
+  const skin = 0xd8a878, pants = 0x2a3140;   /* 与 buildPerson 完全一致 */
+  let uniform = 0x2a4a72, glowc = 0xff4444;
+  if (type === 'heavy'){ uniform = 0x5a262e; glowc = 0xff6a33; }
+  else if (type === 'fast'){ uniform = 0x2c4722; glowc = 0xffb020; }
+  g.scale.setScalar(type === 'heavy' ? 1.16 : type === 'fast' ? 0.95 : 1);
+
+  const mat = (c, rough) => new THREE.MeshStandardMaterial({
+    color: c, roughness: rough == null ? 0.85 : rough, metalness: 0.05
+  });
+  const addMesh = (geo, mm, px, py, pz, parentObj) => {
+    const msh = new THREE.Mesh(geo, mm);
+    msh.position.set(px, py, pz);
+    parentObj.add(msh);
+    return msh;
+  };
+
+  /* 上半身组：走路颠簸 / 冲刺前倾 / 肩部扭动作用于此 */
+  const body = new THREE.Group();
+  g.add(body);
+
+  /* 躯干（同同学尺寸）+ 衬衫 */
+  addMesh(new THREE.BoxGeometry(0.44, 0.58, 0.27), mat(uniform, 0.8), 0, 1.09, 0.01, body);
+
+  /* 手臂：box 与同学同尺寸，肩点枢轴使摆臂自然 */
+  const mkArm = (side) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(0.29 * side, 1.32, 0.13);
+    addMesh(new THREE.BoxGeometry(0.115, 0.42, 0.115), mat(uniform, 0.8), 0, -0.21, 0, pivot);
+    body.add(pivot);
+    return pivot;
+  };
+  const armL = mkArm(-1), armR = mkArm(1);
+
+  /* 头 + 头发（与同学完全一致） */
+  const head = new THREE.Mesh(getSphereGeo(0.135, 16, 12), mat(skin, 0.75));
+  head.position.set(0, 1.52, 0.02);
+  body.add(head);
+  const hair = new THREE.Mesh(
+    new THREE.SphereGeometry(0.142, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.62),
+    mat(0x18181c, 1)
+  );
+  hair.position.set(0, 1.535, 0.02);
+  body.add(hair);
+
+  /* 站姿腿：与同学同尺寸的两条 box，髋点枢轴供摆腿 */
+  const mkLeg = (side) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(0.115 * side, 0.86, 0);
+    addMesh(new THREE.BoxGeometry(0.17, 0.92, 0.17), mat(pants, 0.9), 0, -0.47, 0, pivot);
+    g.add(pivot);
+    return pivot;
+  };
+  const legL = mkLeg(-1), legR = mkLeg(1);
+
+  /* 头顶告警灯 + 光晕（玩法提示，保留） */
+  const warnLight = new THREE.Mesh(
+    getSphereGeo(0.045, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xff3333 })
+  );
+  warnLight.position.set(0, 0.18, 0.02);
+  head.add(warnLight);
+  const glow = new THREE.Mesh(
+    getSphereGeo(0.09, 8, 8),
+    new THREE.MeshBasicMaterial({
+      color: glowc, transparent: true, opacity: 0.3,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    })
+  );
+  glow.position.set(0, 0.19, 0.02);
+  head.add(glow);
+
+  addContactShadow(g, 0.52);
+
+  return {
+    group: g, armL, armR, legL, legR,
+    calfL: null, calfR: null, head, body,
+    warnLight, glow,
+    phase: Math.random() * Math.PI * 2
+  };
+}
+
 function buildSecurityGuardBox(x, z, type, parent){
   type = type || 'normal';
   const g = new THREE.Group();

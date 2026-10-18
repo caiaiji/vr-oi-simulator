@@ -206,9 +206,9 @@ function makeGLTFGuard(x, z, type, parent){
   };
 }
 
-/* 统一入口：GLTF 已停用（蒙皮渲染崩坏），一律使用胶囊体拟人版建模 */
+/* 统一入口：与同学/老师同一套方块人建模（buildPersonGuard） */
 function buildSecurityGuard(x, z, type, parent){
-  return buildSecurityGuardBox(x, z, type, parent);
+  return buildPersonGuard(x, z, type, parent);
 }
 
 initGuardGLTF();
