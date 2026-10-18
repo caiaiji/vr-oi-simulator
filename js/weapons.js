@@ -31,7 +31,7 @@ const WEAPONS = {
     verb: '椅子重击', launch: '椅子抡圆',
     /* 近战/投掷两用：贴身抡人，否则丢出去炸落点 */
     throwable: true, throwVerb: '丢椅子', throwHint: '砸哪炸哪',
-    throwSpeed: 10, throwLift: 3.0, throwSize: 0.06, projColor: 0x6b5137,
+    throwSpeed: 15, throwLift: 1.4, throwSize: 0.06, projColor: 0x6b5137,
     aoeR: 2.6, aoeDmg: 3, aoeKb: 2.0
   },
   ruler: {
@@ -502,6 +502,9 @@ function punchThrow(w){
 }
 
 function updateThrows(worldDt){
+  /* 出界判定：教室 8/7.5 保持原行为；竞技场按世界边界（±11.5） */
+  const tb = (typeof getWorldBounds === 'function' && state.arenaMode)
+    ? getWorldBounds() : { hw: 8, hd: 7.5 };
   for (let i = thrownList.length - 1; i >= 0; i--){
     const it = thrownList[i];
     it.life -= worldDt;
@@ -529,7 +532,7 @@ function updateThrows(worldDt){
       if (throwCollides(p)){ done = true; break; }
       /* 出界 / 落地 / 超时 */
       if (it.life <= 0 || p.y < 0.02 || p.y > 3.2 ||
-          Math.abs(p.x) > 8 || Math.abs(p.z) > 7.5){ done = true; break; }
+          Math.abs(p.x) > tb.hw || Math.abs(p.z) > tb.hd){ done = true; break; }
       /* 命中首个活保安：不限距离，撞到就生效 */
       for (let gi = 0; gi < securityGuards.length; gi++){
         const g = securityGuards[gi];
@@ -559,7 +562,8 @@ function updateThrows(worldDt){
 function impactThrow(idx, hitGuard){
   const it = thrownList[idx];
   const p = it.mesh.position.clone();
-  scene.remove(it.mesh);
+  /* parent 通用：教室/竞技场挂在不同场景，都能正确移除 */
+  if (it.mesh.parent) it.mesh.parent.remove(it.mesh);
   thrownList.splice(idx, 1);
   /* 椅子：落点群伤（砸中人 / 砸墙 / 落地都会炸） */
   let aoeN = 0;
