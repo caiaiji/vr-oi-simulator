@@ -259,6 +259,8 @@ function updateGuards(realDt, t){
   for (let i = 0; i < securityGuards.length; i++){
     const g = securityGuards[i];
     if (!g.userData.alive) continue;
+    /* 竞技场登场硬直：现形后 0.9 秒内不移动不攻击，防止刷脸上秒抓 */
+    if (g.userData.spawnT > 0){ g.userData.spawnT -= realDt; continue; }
 
     const pos = g.group.position;
     const dx = state.pos.x - pos.x;

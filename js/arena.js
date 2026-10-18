@@ -62,11 +62,24 @@ function spawnArenaGuards(n){
   if (typeof pruneDeadGuards === 'function') pruneDeadGuards();
   /* 以玩家当前站位为中心包抄：每一波都是包围圈，没有安全打靶位 */
   const px = state.pos.x, pz = state.pos.z;
+  const axMin = -ARENA_HW + 1.5, axMax = ARENA_HW - 1.5;
+  const azMin = -ARENA_HD + 1.5, azMax = ARENA_HD - 1.5;
   for (let i = 0; i < n; i++){
-    const angle = Math.random() * Math.PI * 2;
-    const dist = 6.5 + Math.random() * 3.0;
-    const gx = clamp(px + Math.cos(angle) * dist, -ARENA_HW + 1.2, ARENA_HW - 1.2);
-    const gz = clamp(pz + Math.sin(angle) * dist, -ARENA_HD + 1.2, ARENA_HD - 1.2);
+    /* 刷新点必须落在场内且离玩家至少 5.5m：贴墙站也不可能刷在脚下 */
+    let gx = px, gz = pz, ok = false;
+    for (let t = 0; t < 24 && !ok; t++){
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 6.5 + Math.random() * 3.0;
+      gx = px + Math.cos(angle) * dist;
+      gz = pz + Math.sin(angle) * dist;
+      ok = gx > axMin && gx < axMax && gz > azMin && gz < azMax;
+    }
+    if (!ok){
+      /* 极端贴角：从玩家指向场心的方向 7m 处钻出 */
+      const ca = Math.atan2(-pz, -px);
+      gx = clamp(px + Math.cos(ca) * 7.0, axMin, axMax);
+      gz = clamp(pz + Math.sin(ca) * 7.0, azMin, azMax);
+    }
 
     const type = (typeof arenaGuardType === 'function')
       ? arenaGuardType()
@@ -76,7 +89,8 @@ function spawnArenaGuards(n){
       speed: arenaGuardSpeed(arenaWave, type),
       alive: true,
       type: type,
-      hp: type === 'heavy' ? 2 : 1
+      hp: type === 'heavy' ? 2 : 1,
+      spawnT: 0.9   /* 登场硬直：先亮个相，给玩家反应时间 */
     };
     securityGuards.push(g);
     state.guardsSpawned = (state.guardsSpawned || 0) + 1;
