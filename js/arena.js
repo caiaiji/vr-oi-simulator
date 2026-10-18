@@ -170,6 +170,13 @@ function buildArena(){
     addObstacle(cx, cz, 0.9, 0.9);
   }
 
+  /* 全局照明：环境光 + 半球光 + 主方向光（否则竞技场只有红警示灯，人物全黑） */
+  arenaScene.add(new THREE.AmbientLight(0xfff1e8, 0.5));
+  arenaScene.add(new THREE.HemisphereLight(0xc8d8ff, 0x2a2427, 0.55));
+  const dirMain = new THREE.DirectionalLight(0xfff0dc, 0.55);
+  dirMain.position.set(2, 6, 2);
+  arenaScene.add(dirMain);
+
   /* 灯光：四角红灯 + 中央罩顶 */
   for (const [lx, lz] of [[-9, -9], [9, -9], [-9, 9], [9, 9]]){
     const pl = new THREE.PointLight(0xff2a1f, 0.55, 22, 2);

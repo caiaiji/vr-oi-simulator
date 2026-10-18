@@ -334,6 +334,9 @@ function updateGuards(realDt, t){
       if (g.armR) g.armR.rotation.x += (aimBase - ws * swingAmp - g.armR.rotation.x) * armK;
       if (g.legL) g.legL.rotation.x = ws * 0.52;
       if (g.legR) g.legR.rotation.x = -ws * 0.52;
+      /* 膝盖弯曲：后摆腿折膝，跑动感 */
+      if (g.calfL) g.calfL.rotation.x += (Math.max(0, g.legL.rotation.x) * 0.9 - g.calfL.rotation.x) * 0.5;
+      if (g.calfR) g.calfR.rotation.x += (Math.max(0, g.legR.rotation.x) * 0.9 - g.calfR.rotation.x) * 0.5;
     }
     if (g.body){
       g.body.position.y = isSpawning
@@ -341,8 +344,12 @@ function updateGuards(realDt, t){
         : Math.abs(Math.sin(t * freq + g.phase)) * 0.042;
       const tiltTarget = (d < 3.0 && !isSpawning) ? -0.13 : 0;  /* 冲刺前倾 */
       g.body.rotation.x += (tiltTarget - g.body.rotation.x) * 0.12;
+      g.body.rotation.z += (ws * 0.05 - g.body.rotation.z) * 0.2;  /* 肩部随步伐扭动 */
     }
-    if (g.head) g.head.rotation.y = Math.sin(t * 2 + g.phase) * 0.2;
+    if (g.head){
+      g.head.rotation.y = Math.sin(t * 2 + g.phase) * 0.22;
+      g.head.rotation.x += ((isSpawning ? 0.04 : -Math.abs(ws) * 0.05) - g.head.rotation.x) * 0.2;
+    }
     /* 抓人姿态已并入上方摆臂分支：近身时双臂自然前伸 */
 
     if (g.warnLight){
