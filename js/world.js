@@ -443,14 +443,19 @@ function buildPerson(x, z, shirtColor, rotY, startPose){
            phase: Math.random() * Math.PI * 2 };
 }
 
-function buildSecurityGuard(x, z){
+function buildSecurityGuard(x, z, type){
+  type = type || 'normal';
   const g = new THREE.Group();
   g.position.set(x, 0, z);
   scene.add(g);
 
   const skin = 0xd0a070;
-  const uniform = 0x1c2a44;
   const pants = 0x141e30;
+  /* 种类差异：heavy 暗红重装（大个、两段血）；fast 橄榄绿闪电（小个、快） */
+  let uniform = 0x1c2a44, stripec = 0xffcc33, glowc = 0xff3333;
+  if (type === 'heavy'){ uniform = 0x3a1d22; stripec = 0xff5533; glowc = 0xff6a33; }
+  else if (type === 'fast'){ uniform = 0x22341c; stripec = 0xffd23f; glowc = 0xffb020; }
+  g.scale.setScalar(type === 'heavy' ? 1.16 : type === 'fast' ? 0.95 : 1);
 
   /* ---------- 腿 ---------- */
   box(0.18, 0.17, 0.46, pants, -0.115, 0.52, 0.22, g);
@@ -460,8 +465,8 @@ function buildSecurityGuard(x, z){
 
   /* ---------- 制服 ---------- */
   box(0.50, 0.62, 0.29, uniform, 0, 1.10, 0.01, g);
-  box(0.52, 0.035, 0.31, 0xffcc33, 0, 0.90, 0.01, g);
-  box(0.52, 0.035, 0.31, 0xffcc33, 0, 1.28, 0.01, g);
+  box(0.52, 0.035, 0.31, stripec, 0, 0.90, 0.01, g);
+  box(0.52, 0.035, 0.31, stripec, 0, 1.28, 0.01, g);
   box(0.52, 0.045, 0.31, 0x0a1525, 0, 1.40, 0.01, g);
   box(0.52, 0.05, 0.31, 0x080808, 0, 0.80, 0.01, g);
 
@@ -509,7 +514,7 @@ function buildSecurityGuard(x, z){
   /* ---------- 徽章 ---------- */
   const badge = new THREE.Mesh(
     new THREE.CylinderGeometry(0.02, 0.02, 0.01, 8),
-    new THREE.MeshStandardMaterial({ color: 0xffcc33, roughness: 0.3, metalness: 0.8 })
+    new THREE.MeshStandardMaterial({ color: stripec, roughness: 0.3, metalness: 0.8 })
   );
   badge.rotation.x = Math.PI / 2;
   badge.position.set(0, 1.76, 0.15);
@@ -527,7 +532,7 @@ function buildSecurityGuard(x, z){
   const glow = new THREE.Mesh(
     getSphereGeo(0.13, 8, 8),
     new THREE.MeshBasicMaterial({
-      color: 0xff3333, transparent: true, opacity: 0.30,
+      color: glowc, transparent: true, opacity: 0.30,
       blending: THREE.AdditiveBlending, depthWrite: false
     })
   );
@@ -664,6 +669,15 @@ function pruneDeadGuards(){
   }
 }
 
+/* 保安种类掷骰：随击倒数逐步解锁。heavy 两段血、慢而大；fast 快而脆 */
+function rollGuardType(){
+  const k = state.guardKills;
+  const r = Math.random();
+  if (k >= 8 && r < 0.20) return 'heavy';
+  if (k >= 4 && r < 0.46) return 'fast';
+  return 'normal';
+}
+
 function spawnTwoGuards(){
   if (state.ended) return;
   pruneDeadGuards();
@@ -693,10 +707,17 @@ function spawnTwoGuards(){
       gz = clamp(state.pos.z + Math.sin(angle) * dist, -6.5, 6.5);
     }
 
-    const g = buildSecurityGuard(gx, gz);
+    const type = rollGuardType();
+    const g = buildSecurityGuard(gx, gz, type);
+    /* 重装：慢但两段血；快速：快但脆 */
+    let spd = GUARD_SPEED_BASE;
+    if (type === 'heavy') spd = 0.42;
+    else if (type === 'fast') spd = 0.92;
     g.userData = {
-      speed: GUARD_SPEED_BASE + speedBonus,
-      alive: true
+      speed: spd + speedBonus,
+      alive: true,
+      type: type,
+      hp: type === 'heavy' ? 2 : 1
     };
     securityGuards.push(g);
     state.guardsSpawned = (state.guardsSpawned || 0) + 1;

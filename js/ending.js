@@ -14,6 +14,9 @@ function showEnding(score, detailHtml){
     <div class="stat"><div class="sv">${fmtTime(elapsedSec)}</div><div class="sl">实际用时</div></div>
     <div class="stat"><div class="sv">${state.warnCount}</div><div class="sl">警告次数</div></div>
     <div class="stat"><div class="sv">${state.guardKills}</div><div class="sl">击倒保安</div></div>
+    <div class="stat"><div class="sv">${state.comboMax || 0}</div><div class="sl">最大连击</div></div>
+    <div class="stat"><div class="sv">${state.lootCount || 0}</div><div class="sl">拾取补给</div></div>
+    <div class="stat"><div class="sv">${state.weaponsOwned ? state.weaponsOwned.length - 1 : 0}/5</div><div class="sl">武器收集</div></div>
   `;
   const achList = $('endAch');
   if (state.achievements.size){

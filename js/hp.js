@@ -60,6 +60,7 @@ function damagePlayer(g, now){
   audio.beep(160, 0.22, 0.07, 'sawtooth');
   if (r === 'damage'){
     state.hp--;
+    if (typeof onPlayerHurt === 'function') onPlayerHurt();   /* 断连击 */
     renderHp();
     toast('你被命中了！', 1500);
     /* 把动手的保安推开一点，给玩家喘息空间 */

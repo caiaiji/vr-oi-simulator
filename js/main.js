@@ -14,13 +14,32 @@ function bindEvents(){
        避免点击造成状态中断而进度环仍残留的问题；此时点击仅用于
        在指针意外释放时重新捕获鼠标 */
     if (hasDialog()){ if (!pointerLocked) requestLock(); return; }
-    /* 未锁定时：有可攻击目标就直接出拳（锁定失效也能打），
-       否则重新捕获鼠标——避免误触其他交互 */
-    if (!pointerLocked && !actionSpace){ requestLock(); return; }
-    /* 左键即原空格键语义：准星指向可攻击目标（老师/保安，且在范围内）
-       时执行攻击，否则执行普通交互 */
+    /* 未锁定时每次都先尝试重新捕获鼠标（失败由 pointerlockerror 转
+       转向兜底），同时这次点击照常当作出手/交互——
+       修复"锁定失效时点击只出拳、永远不再重锁"的老 BUG */
+    if (!pointerLocked) requestLock();
+    /* 左键即原空格键语义：准星指向可攻击目标（老师/保安，且含投掷类
+       空投）时执行攻击，否则执行普通交互 */
     doInteract(actionSpace ? 'space' : 'e');
   });
+
+  /* 右键按住拖动：转向兜底（指针锁定失败时的鼠标转向方案） */
+  renderer.domElement.addEventListener('mousedown', e => {
+    if (e.button !== 2) return;
+    if (!state.started || state.ended || hasDialog()) return;
+    dragLooking = true;
+  });
+  window.addEventListener('mouseup', e => {
+    if (e.button === 2) dragLooking = false;
+  });
+  renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+
+  /* 滚轮循环切换武器（世界视图内；弹窗期不动） */
+  document.addEventListener('wheel', e => {
+    if (!state.started || state.ended || state.view !== 'world') return;
+    if (hasDialog()) return;
+    if (typeof cycleWeapon === 'function') cycleWeapon(e.deltaY > 0 ? 1 : -1);
+  }, { passive: true });
 
   document.addEventListener('keydown', e => {
     /* 走廊 */
@@ -72,14 +91,14 @@ function bindEvents(){
     const k = KEYMAP[e.code];
     if (k){
       state.keys[k] = true;
-      if ('wasd'.includes(k)) e.preventDefault();
+      if ('wasd'.includes(k) || k.indexOf('turn') === 0) e.preventDefault();
     }
     if (e.code === 'KeyE'){
       /* 弹窗优先：E 用来点按钮，不作用于场景 */
       if (hasDialog()) activateDialogButton();
-      /* 与左键同优先级：可攻击则出拳，否则交互。
-         这条路径不依赖指针锁定，锁定失效时也能打 */
-      else doInteract(actionSpace ? 'space' : 'e');
+      /* E 键交互优先（拾取/开门/用电脑），无交互目标时再攻击/投掷；
+         左键保持攻击优先。都不依赖指针锁定，锁定失效时也能用 */
+      else doInteract(actionE ? 'e' : 'space');
     }
     if (e.code === 'KeyF'){ doInteract('f'); }
     if (e.code === 'Space'){
@@ -88,6 +107,15 @@ function bindEvents(){
       e.preventDefault();
     }
     if (e.code === 'KeyH') callTeacher();
+    if (e.code === 'KeyQ'){
+      if (typeof tryDash === 'function') tryDash();
+    }
+    /* 数字键 1-6 切换武器（弹窗选项优先，弹窗期不切换） */
+    if (!hasDialog() && /^Digit[1-6]$/.test(e.code)){
+      if (typeof trySwitchWeapon === 'function'){
+        trySwitchWeapon(Number(e.code.slice(5)));
+      }
+    }
   });
 
   document.addEventListener('keyup', e => {
@@ -109,12 +137,23 @@ function bindEvents(){
   /* ---------- 指针锁定 ---------- */
   document.addEventListener('pointerlockchange', () => {
     pointerLocked = document.pointerLockElement === lockElement();
-    if (pointerLocked) lastLockAt = performance.now();
+    if (pointerLocked){
+      lastLockAt = performance.now();
+      /* 鼠标锁定恢复：收起转向兜底徽标 */
+      turnMode = false;
+      const tb = $('turnBadge');
+      if (tb) tb.classList.add('hidden');
+    }
     /* 锁定被释放（通常是 Esc）：世界视图下打开设置面板 */
     else if (state.view === 'world' && state.started && !state.ended) openPauseMenu();
   });
   document.addEventListener('pointerlockerror', () => {
-    if (canLockView()) toast('鼠标锁定失败，点击画面重试。', 1600);
+    if (!canLockView()) return;
+    /* 内嵌浏览器常拒绝指针锁定：切转向兜底（方向键 / 右键拖动） */
+    turnMode = true;
+    const tb = $('turnBadge');
+    if (tb) tb.classList.remove('hidden');
+    toast('鼠标锁定失败 —— 方向键 ← → ↑ ↓ 或 按住右键拖动 转动视角', 2400);
   });
   /* 鼠标位移 → 视角目标角，平滑由 applyLook 完成 */
   document.addEventListener('mousemove', e => {
@@ -128,6 +167,14 @@ function bindEvents(){
       pitchTarget -= my * mouseSens * SENS_SCALE;   // 鼠标下移 → 低头
       pitchTarget = clamp(pitchTarget, -1.35, 1.35);
       return;
+    }
+    /* 未锁定：右键按住拖动 = 转向兜底，与方向键共用目标角 */
+    if (dragLooking){
+      const mx = clamp(e.movementX || 0, -MAX_MOUSE_STEP, MAX_MOUSE_STEP);
+      const my = clamp(e.movementY || 0, -MAX_MOUSE_STEP, MAX_MOUSE_STEP);
+      yawTarget   -= mx * mouseSens * SENS_SCALE;
+      pitchTarget -= my * mouseSens * SENS_SCALE;
+      pitchTarget = clamp(pitchTarget, -1.35, 1.35);
     }
     /* 未锁定：记录鼠标 NDC，供弹窗按钮拾取（此时可用鼠标直接点选） */
     dlgMouseNdc.set((e.clientX / innerWidth) * 2 - 1,
@@ -288,6 +335,8 @@ function bindEvents(){
     requestLock();
     /* 尝试恢复存档 */
     if (tryLoadSave()) toast('已恢复上次的答题进度。', 2200);
+    /* 开局就刷武器拾取点（粉笔/橡皮/键盘/椅子/直尺） */
+    if (typeof spawnWeaponPickups === 'function') spawnWeaponPickups();
   };
 }
 
@@ -454,6 +503,9 @@ function animate(){
       lastInteractUpdate = now;
       updateInteract();
     }
+
+    /* 街机强化：连击衰减 / 冲刺余量 / 掉落拾取 / 应援 / 氛围事件 */
+    if (typeof updateArcade === 'function') updateArcade(realDt, worldDt, t);
   }
 
   /* HUD */

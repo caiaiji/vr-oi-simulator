@@ -29,24 +29,32 @@ function updateInteract(){
     return;
   }
 
+  /* 当前武器参数（weapons.js）；投掷类不限距离索敌 */
+  const wpNow = typeof weaponParams === 'function' ? weaponParams() : null;
+  const prange = wpNow ? (wpNow.throwable ? 40 : wpNow.range) : GUARD_PUNCH_RANGE;
+
   /* 优先：保安 → 空格 */
   for (let i = 0; i < securityGuards.length; i++){
     const g = securityGuards[i];
     if (!g.userData.alive) continue;
     const d = Math.hypot(state.pos.x - g.group.position.x, state.pos.z - g.group.position.z);
-    if (d < GUARD_PUNCH_RANGE){
-      /* 扇形窗口内才判定命中；出拳会扫倒范围内全部保安 */
-      if (!inAttackArc(g.group.position.x, g.group.position.z)) continue;
+    if (d < prange){
+      /* 扇形窗口内才判定命中；攻击会扫倒范围内全部保安 */
+      if (!inAttackArc(g.group.position.x, g.group.position.z,
+                       wpNow ? wpNow.arc : undefined)) continue;
       actionSpace = { fn: punchGuardsArc };
-      const txt = `[ 左键 ] 出拳（拳锋 ${GUARD_PUNCH_RANGE.toFixed(1)}m · 前方扇形）`;
+      const chairMelee = wpNow && wpNow.id === 'chair' && d <= wpNow.range;
+      const txt = wpNow && wpNow.throwable && !chairMelee
+        ? `[ 左键 ] ${wpNow.throwVerb || wpNow.verb}（距离 ${d.toFixed(1)}m · ${wpNow.throwHint || '瞄哪扔哪'}）`
+        : `[ 左键 ] ${wpNow ? wpNow.verb : '出拳'}（锋距 ${(wpNow && wpNow.id === 'chair' ? wpNow.range : prange).toFixed(1)}m · 前方扇形）`;
       if (lastInteractKey !== txt){ promptEl.textContent = txt; lastInteractKey = txt; }
       promptEl.classList.remove('hidden');
       return;
     }
   }
 
-  /* 老师 → 空格 */
-  if (teacher && !teacher.userData.leaving){
+  /* 老师 → 空格（投掷类武器不提示殴打老师：准星留给远程） */
+  if (teacher && !teacher.userData.leaving && !(wpNow && wpNow.throwable)){
     const d = Math.hypot(state.pos.x - teacher.group.position.x,
                          state.pos.z - teacher.group.position.z);
     /* 同样要求落在视角扇形窗口内 */
@@ -72,7 +80,7 @@ function updateInteract(){
         if (state.teacherDown){
           const dBody = Math.hypot(state.pos.x - n.group.position.x,
                                    state.pos.z - n.group.position.z);
-          if (dBody <= GUARD_PUNCH_RANGE &&
+          if (dBody <= prange &&
               inAttackArc(n.group.position.x, n.group.position.z)){
             actionSpace = { fn: () => downNPC(n) };
             const txt = `[ 左键 ] 殴打同学 ${ud.name}（他已经不敢告老师了）`;
@@ -135,10 +143,20 @@ function updateInteract(){
     promptEl.classList.remove('hidden');
   }
 
-  /* 兜底提示：没有任何可交互/可攻击目标时，才提醒重新捕获鼠标。
+  /* 投掷类武器：没有目标也能空投——不限距离，无论打不打得到 */
+  if (!actionSpace && wpNow && wpNow.throwable){
+    actionSpace = { fn: punchGuardsArc };
+    const txt = `[ 左键 ] ${wpNow.throwVerb || wpNow.verb}（不限距离）`;
+    if (lastInteractKey !== txt){ promptEl.textContent = txt; lastInteractKey = txt; }
+    promptEl.classList.remove('hidden');
+  }
+
+  /* 兜底提示：没有任何可交互/可攻击目标时，才提醒补充鼠标控制。
      注意动作判定不依赖指针锁定——锁定失效时 E / 左键依然能交互和出拳。 */
   if (!pointerLocked && !actionE && !actionF && !actionSpace){
-    const txt = '鼠标已释放 —— 点击画面继续考试';
+    const txt = turnMode
+      ? '方向键 ← → ↑ ↓ 或 按住右键拖动 —— 转动视角'
+      : '鼠标已释放 —— 点击画面继续考试';
     if (lastInteractKey !== txt){ promptEl.textContent = txt; lastInteractKey = txt; }
     promptEl.classList.remove('hidden');
   }

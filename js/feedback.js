@@ -72,6 +72,17 @@ const ACHIEVEMENTS = {
   explorer:   { name: '厕所旅行家', desc: '完整去过一次洗手间' },
   wanderer: { name: '红圈五连', desc: '同一场考试，五次随意走动' }
   ,army: { name: '一人军队', desc: '击倒全部 200 名保安（隐藏结局）' }
+  ,combo15: { name: '连击宗师', desc: '单次连击达到 15' }
+  ,combo30: { name: '心流之王', desc: '单次连击达到 30' }
+  ,loot5:   { name: '考场拾荒者', desc: '捡起 5 件掉落补给' }
+  ,heavy10: { name: '拆墙专业户', desc: '放倒 10 名重装保安' }
+  ,dash30:  { name: '考场博尔特', desc: '冲刺 30 次' }
+  ,kinoboard20: { name: '键盘侠', desc: '用键盘击倒 20 名保安' }
+  ,chair30:  { name: '板凳战神', desc: '用椅子击倒 30 名保安' }
+  ,ruler15:  { name: '尺有所长', desc: '用直尺击倒 15 名保安' }
+  ,armed4:   { name: '全副武装', desc: '集齐全部 4 件近战武器' }
+  ,chalk20:  { name: '粉笔刺客', desc: '用粉笔头击倒 20 名保安' }
+  ,eraser15: { name: '橡皮擦掉你', desc: '用橡皮击倒 15 名保安' }
 };
 
 function unlockAch(id){

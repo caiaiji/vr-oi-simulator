@@ -12,6 +12,16 @@ function applyLook(dt){
   recoilPitch += (0 - recoilPitch) * kr;
   recoilYaw   += (0 - recoilYaw)   * kr;
 
+  /* 转向兜底：未锁定时方向键转动视角。与鼠标锁定共享目标角，
+     即使指针锁定一直被浏览器拒绝（如内嵌窗口），画面也能转。 */
+  if (!pointerLocked){
+    const ts = TURN_SPEED * dt;
+    if (state.keys['turnL']) yawTarget += ts;
+    if (state.keys['turnR']) yawTarget -= ts;
+    if (state.keys['turnU']) pitchTarget += ts;
+    if (state.keys['turnD']) pitchTarget -= ts;
+  }
+
   /* 旋转输入由 mousemove（指针锁定）写入 yawTarget / pitchTarget，
      这里只负责平滑插值与俯仰限位 */
   pitchTarget = clamp(pitchTarget, -1.35, 1.35);
@@ -34,6 +44,16 @@ const LOOK_VIEWS = new Set(['world']);   // 仅世界视图捕获鼠标（走廊
 const MAX_MOUSE_STEP = 80;               // 单次位移钳制（px），防异常跳变
 let pointerLocked = false;
 let lastLockAt = 0;
+
+/* ---------- 转向兜底（指针锁被拒时的替代转视角）----------
+   方向键 / 按住右键拖动。方向键输入在 applyLook 里按帧积分；
+   右键拖动由 main.js 的 mousemove 写入，两者共用同一组目标角，
+   平滑插值逻辑不变。
+   turnMode 在 pointerlockerror 后置位：解锁 turnBadge 徽标与兜底文案；
+   一次成功锁定即复位。 */
+let turnMode = false;
+let dragLooking = false;
+const TURN_SPEED = 2.0;        // 方向键转向速度（rad/s）
 
 function lockElement(){
   return renderer ? renderer.domElement : document.body;
@@ -59,6 +79,9 @@ function releaseLock(){
 const KEYMAP = {
   KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd',
   ShiftLeft: 'shift', ShiftRight: 'shift',
+  /* 转向兜底键：指针锁定失败（内嵌浏览器常被拒）时也能转动视角 */
+  ArrowLeft: 'turnL', ArrowRight: 'turnR',
+  ArrowUp: 'turnU', ArrowDown: 'turnD'
 };
 
 /* 复用的临时向量，避免每帧 new Vector3 触发 GC */
@@ -69,7 +92,11 @@ const _move = new THREE.Vector3();
 function updatePlayer(dt){
   updateJump(dt);
   const sprinting = !!state.keys['shift'];
-  const speed = sprinting ? 5.0 : 3.1;   // Shift 加速
+  /* 连击 ×5 疾步 / 红牛疾速 的移速加成 */
+  const speedMul =
+    (typeof comboSpeedMul === 'function' ? comboSpeedMul() : 1) *
+    (typeof speedBuffMul === 'function' ? speedBuffMul() : 1);
+  const speed = (sprinting ? 5.0 : 3.1) * speedMul;   // Shift 加速
   _fwd.set(-Math.sin(state.yaw), 0, -Math.cos(state.yaw));
   _right.set(Math.cos(state.yaw), 0, -Math.sin(state.yaw));
   _move.set(0, 0, 0);
@@ -78,10 +105,19 @@ function updatePlayer(dt){
   if (state.keys['d']) _move.add(_right);
   if (state.keys['a']) _move.sub(_right);
 
+  const walking = _move.lengthSq() > 0;
+  if (walking) _move.normalize().multiplyScalar(speed * dt);
+
+  /* 冲刺位移（街机模块注入，含撞开贴身保安），与步行叠加后统一过碰撞 */
+  if (typeof dashImpulse === 'function'){
+    const dImp = dashImpulse(dt);
+    _move.x += dImp.x;
+    _move.z += dImp.z;
+  }
+
   const moving = _move.lengthSq() > 0;
-  lastMoveSpeed = moving ? speed : 0;
+  lastMoveSpeed = walking ? speed : (moving ? 4.6 : 0);
   if (moving){
-    _move.normalize().multiplyScalar(speed * dt);
     const nx = clamp(state.pos.x + _move.x, -7.5, 7.5);
     const nz = clamp(state.pos.z + _move.z, -6.5, 6.5);
     /* 分轴滑动碰撞 */
@@ -90,8 +126,10 @@ function updatePlayer(dt){
     if (air || !collides(nx, state.pos.z, 0.28)) state.pos.x = nx;
     if (air || !collides(state.pos.x, nz, 0.28)) state.pos.z = nz;
 
-    state.bob += dt * (sprinting ? 15 : 11);   // 疾走时脚步更急促
-    if (Math.sin(state.bob) > 0.96 && Math.random() < 0.4) audio.step();
+    if (walking){
+      state.bob += dt * (sprinting ? 15 : 11);   // 疾走时脚步更急促
+      if (Math.sin(state.bob) > 0.96 && Math.random() < 0.4) audio.step();
+    }
   } else {
     state.bob += dt * 1.2;
   }

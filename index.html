@@ -27,6 +27,12 @@
 <div id="prompt" class="hidden"></div>
 <div id="toastStack"></div>
 <div id="achNotify"></div>
+<div id="floatLayer"></div>
+<div id="killfeed"></div>
+<div id="comboWrap" class="hidden"><div id="comboNum">1</div><div id="comboLabel">COMBO</div></div>
+<div id="buffWrap" class="hidden"><span id="buffText">疾速</span><i id="buffBar"></i></div>
+<div id="weaponHud" class="hidden"></div>
+<div id="turnBadge" class="hidden">方向键 ← → ↑ ↓ 转动视角 · 按住右键拖动也行</div>
 
 <!-- ===================== 开始界面 ===================== -->
 <div id="start">
@@ -41,7 +47,11 @@
     <kbd>E</kbd> 或 <kbd>鼠标左键</kbd> 交互（电脑 · 草稿纸 · 水杯 · 出门）；<br>
     <kbd>鼠标左键</kbd> 出拳：需<b>正面对准</b>目标，一拳扫倒拳锋范围内全部敌人<br>
     <kbd>F</kbd> 干扰同学 &nbsp;·&nbsp;
-    <kbd>H</kbd> 举手呼叫监考 &nbsp;·&nbsp; <kbd>Esc</kbd> 释放鼠标 / 打开设置<br><br>
+    <kbd>H</kbd> 举手呼叫监考 &nbsp;·&nbsp; <kbd>Q</kbd> 冲刺（可撞开贴身的人）<br>
+    数字键 <kbd>1</kbd>-<kbd>6</kbd> 切换武器；开局即可在考场拾取 键盘 / 椅子 / 直尺 / 粉笔头 / 橡皮（走近拾取）<br>
+    <kbd>Esc</kbd> 释放鼠标 / 打开设置<br><br>
+    <b>连击加成</b>：连续击倒计入连击，越高跑得越快、拳风越远，断了清零。<br>
+    保安会<b>掉落补给</b>：矿泉水回血 · 红牛加速（走近自动拾取）；重装保安必定掉落。<br><br>
     弹窗操作：<b>视线停留 1 秒</b>自动确认，也可直接左键点击。<br><br>
 
     <div class="set-title">视角手感调校</div>
@@ -229,7 +239,13 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="assets/vendor/three.min.js"></script>
+<script>
+/* 本地文件优先（离线也能直接打开 index.html）；万一缺失再尝试 CDN */
+if (typeof THREE === 'undefined'){
+  document.write('<scr' + 'ipt src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"><\/scr' + 'ipt>');
+}
+</script>
 
 <!-- Three.js 加载失败兜底（需紧跟 CDN 脚本尽早执行） -->
 <script>
@@ -272,20 +288,22 @@ if (typeof THREE === 'undefined'){
 <script src="js/feedback.js"></script>
 <script src="js/hp.js"></script>
 <script src="js/world.js"></script>
-<script src="js/interact.js"></script>
-<script src="js/combat.js"></script>
+<script src="js/interact.js?v=2"></script>
+<script src="js/combat.js?v=2"></script>
+<script src="js/arcade.js"></script>
+<script src="js/weapons.js?v=2"></script>
 <script src="js/debris.js"></script>
 <script src="js/npc.js"></script>
 <script src="js/teacher.js"></script>
 <script src="js/corridor.js"></script>
 <script src="js/ide.js"></script>
 <script src="js/paper.js"></script>
-<script src="js/look.js"></script>
+<script src="js/look.js?v=2"></script>
 <script src="js/reticle.js"></script>
 <script src="js/tension.js"></script>
 <script src="js/postfx.js"></script>
 <script src="js/save.js"></script>
 <script src="js/ending.js"></script>
-<script src="js/main.js"></script>
+<script src="js/main.js?v=2"></script>
 </body>
 </html>
