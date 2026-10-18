@@ -337,6 +337,13 @@ function bindEvents(){
     if (tryLoadSave()) toast('已恢复上次的答题进度。', 2200);
     /* 开局就刷武器拾取点（粉笔/橡皮/键盘/椅子/直尺） */
     if (typeof spawnWeaponPickups === 'function') spawnWeaponPickups();
+    /* 开局 18 秒后两名巡逻保安进场：考场恢复“保安在场”的压迫感 */
+    setTimeout(() => {
+      if (state.ended || state.arenaMode) return;
+      spawnTwoGuards();
+      toast('\u26A0 巡逻保安进了考场，别被他们逮到。', 2200);
+      audio.beep(150, 0.3, 0.06, 'sawtooth');
+    }, 18000);
   };
 }
 

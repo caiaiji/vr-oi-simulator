@@ -150,6 +150,15 @@ function downNPC(n){
   kickView(0.055, (Math.random() - 0.5) * 0.055);
   hitStop = 0.08;
   toast('你一拳放倒了同学！考场里彻底乱了。', 1600);
+  /* 监考已倒的考场再放倒同学：没有活保安在场就立刻引保入场。
+     打谁都会来保安，暴力升级必有响应，不再让人干等 */
+  if (!state.arenaMode &&
+      typeof aliveGuardCount === 'function' && aliveGuardCount() === 0 &&
+      typeof spawnTwoGuards === 'function'){
+    toast('\u26A0 门外传来急促脚步声——保安正在冲进来！', 2200);
+    audio.beep(150, 0.3, 0.06, 'sawtooth');
+    spawnTwoGuards();
+  }
   return true;
 }
 
