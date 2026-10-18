@@ -314,10 +314,36 @@ function updateGuards(realDt, t){
       g.group.rotation.y = Math.atan2(dx, dz);
     }
 
-    const v = Math.sin(t * 3.5 + g.phase) * 0.25;
-    g.armL.rotation.x = -0.25 + v;
-    g.armR.rotation.x = -0.25 - v;
-    g.head.rotation.y = Math.sin(t * 2 + g.phase) * 0.25;
+    /* ---- 拟人步态：摆臂、迈腿、身体颠簸；跑得越快动作越紧 ---- */
+    const gu = g.userData || {};
+    const isSpawning = gu.spawnT > 0;                    /* 登场硬直站定 */
+    const freq = isSpawning ? 0 : 2.5 + (gu.speed || 0.9) * 3.2;
+    const ws = Math.sin(t * freq + g.phase);
+    if (isSpawning){
+      if (g.armL) g.armL.rotation.x += (-0.22 - g.armL.rotation.x) * 0.15;
+      if (g.armR) g.armR.rotation.x += (-0.22 - g.armR.rotation.x) * 0.15;
+      if (g.legL) g.legL.rotation.x *= 0.9;
+      if (g.legR) g.legR.rotation.x *= 0.9;
+    } else {
+      /* 靠近玩家时手臂由摆臂切换为“作势抓人”前伸 */
+      const nearReach = d < GUARD_HIT_RADIUS * 3.2;
+      const aimBase = nearReach ? -1.15 : -0.22;
+      const swingAmp = nearReach ? 0.10 : 0.45;
+      const armK = nearReach ? 0.25 : 1.0;
+      if (g.armL) g.armL.rotation.x += (aimBase + ws * swingAmp - g.armL.rotation.x) * armK;
+      if (g.armR) g.armR.rotation.x += (aimBase - ws * swingAmp - g.armR.rotation.x) * armK;
+      if (g.legL) g.legL.rotation.x = ws * 0.52;
+      if (g.legR) g.legR.rotation.x = -ws * 0.52;
+    }
+    if (g.body){
+      g.body.position.y = isSpawning
+        ? Math.sin(t * 1.8 + g.phase) * 0.012      /* 站定时呼吸起伏 */
+        : Math.abs(Math.sin(t * freq + g.phase)) * 0.042;
+      const tiltTarget = (d < 3.0 && !isSpawning) ? -0.13 : 0;  /* 冲刺前倾 */
+      g.body.rotation.x += (tiltTarget - g.body.rotation.x) * 0.12;
+    }
+    if (g.head) g.head.rotation.y = Math.sin(t * 2 + g.phase) * 0.2;
+    /* 抓人姿态已并入上方摆臂分支：近身时双臂自然前伸 */
 
     if (g.warnLight){
       const blink = 0.5 + 0.5 * Math.sin(t * 6 + g.phase);

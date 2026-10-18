@@ -457,68 +457,123 @@ function buildSecurityGuard(x, z, type, parent){
   else if (type === 'fast'){ uniform = 0x22341c; stripec = 0xffd23f; glowc = 0xffb020; }
   g.scale.setScalar(type === 'heavy' ? 1.16 : type === 'fast' ? 0.95 : 1);
 
-  /* ---------- 腿 ---------- */
-  box(0.18, 0.17, 0.46, pants, -0.115, 0.52, 0.22, g);
-  box(0.18, 0.17, 0.46, pants,  0.115, 0.52, 0.22, g);
-  box(0.17, 0.46, 0.17, pants, -0.115, 0.24, 0.42, g);
-  box(0.17, 0.46, 0.17, pants,  0.115, 0.24, 0.42, g);
+  const mkMat = (c) => new THREE.MeshStandardMaterial({
+    color: c, roughness: 0.85, metalness: 0.05
+  });
 
-  /* ---------- 制服 ---------- */
-  box(0.50, 0.62, 0.29, uniform, 0, 1.10, 0.01, g);
-  box(0.52, 0.035, 0.31, stripec, 0, 0.90, 0.01, g);
-  box(0.52, 0.035, 0.31, stripec, 0, 1.28, 0.01, g);
-  box(0.52, 0.045, 0.31, 0x0a1525, 0, 1.40, 0.01, g);
-  box(0.52, 0.05, 0.31, 0x080808, 0, 0.80, 0.01, g);
+  /* ---------- 上半身组：走路颠簸、冲刺前倾都作用在它身上 ---------- */
+  const body = new THREE.Group();
+  g.add(body);
 
-  /* ---------- 手臂：独立几何 + 独立材质 ---------- */
-  const armL = new THREE.Mesh(
-    new THREE.BoxGeometry(0.14, 0.55, 0.14),
-    new THREE.MeshStandardMaterial({ color: uniform, roughness: 0.88, metalness: 0.04 })
-  );
-  armL.position.set(-0.33, 1.12, 0.10);
-  armL.rotation.x = -0.2;
-  g.add(armL);
+  /* ---------- 躯干 + 制服细节 ---------- */
+  box(0.50, 0.62, 0.29, uniform, 0, 1.10, 0.01, body);
+  box(0.52, 0.035, 0.31, stripec, 0, 0.90, 0.01, body);
+  box(0.52, 0.035, 0.31, stripec, 0, 1.24, 0.01, body);
+  box(0.52, 0.045, 0.31, 0x0a1525, 0, 1.40, 0.01, body);
+  box(0.52, 0.05, 0.31, 0x080808, 0, 0.80, 0.01, body);
+  /* 肩部轮廓 */
+  box(0.16, 0.13, 0.20, uniform, -0.35, 1.34, 0.03, body);
+  box(0.16, 0.13, 0.20, uniform,  0.35, 1.34, 0.03, body);
+  /* 腰间对讲机 */
+  box(0.09, 0.15, 0.05, 0x12151a, 0.28, 0.84, 0.14, body);
+  box(0.07, 0.05, 0.05, 0x454f5c, 0.28, 0.93, 0.14, body);
 
-  const armR = new THREE.Mesh(
-    new THREE.BoxGeometry(0.14, 0.55, 0.14),
-    new THREE.MeshStandardMaterial({ color: uniform, roughness: 0.88, metalness: 0.04 })
-  );
-  armR.position.set(0.33, 1.12, 0.10);
-  armR.rotation.x = -0.2;
-  g.add(armR);
+  /* ---------- 关节手臂：上臂 + 前臂 + 手 ---------- */
+  function makeArm(side){
+    const arm = new THREE.Group();
+    arm.position.set(side * 0.33, 1.30, 0.08);
+    const up = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.26, 0.14), mkMat(uniform));
+    up.position.y = -0.10;
+    arm.add(up);
+    const lo = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.24, 0.12), mkMat(uniform));
+    lo.position.y = -0.30;
+    arm.add(lo);
+    const hand = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.10, 0.085), mkMat(skin));
+    hand.position.y = -0.45;
+    arm.add(hand);
+    return arm;
+  }
+  const armL = makeArm(-1);
+  const armR = makeArm(1);
+  armL.rotation.x = -0.22;
+  armR.rotation.x = -0.22;
+  body.add(armL);
+  body.add(armR);
 
-  /* ---------- 头 ---------- */
+  /* ---------- 脖颈 + 头 + 五官 ---------- */
+  box(0.10, 0.15, 0.10, skin, 0, 1.48, 0.02, body);
   const head = new THREE.Mesh(
     new THREE.SphereGeometry(0.16, 16, 12),
-    new THREE.MeshStandardMaterial({ color: skin, roughness: 0.75, metalness: 0.04 })
+    new THREE.MeshStandardMaterial({ color: skin, roughness: 0.72, metalness: 0.04 })
   );
-  head.position.set(0, 1.58, 0.02);
-  g.add(head);
+  head.position.set(0, 1.60, 0.02);
+  body.add(head);
 
-  /* ---------- 帽子 ---------- */
+  /* 脸：眼白 + 瞳 + 眉 + 嘴（贴球面外，跟着头一起转） */
+  const eyeW = new THREE.MeshStandardMaterial({ color: 0xf5f2ec, roughness: 0.35 });
+  const eyeB = new THREE.MeshStandardMaterial({ color: 0x1a262e, roughness: 0.35 });
+  const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.056, 0.046, 0.02), eyeW);
+  eyeL.position.set(-0.062, 0.046, 0.146);
+  head.add(eyeL);
+  const pupL = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.03, 0.018), eyeB);
+  pupL.position.set(-0.062, 0.046, 0.158);
+  head.add(pupL);
+  const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.056, 0.046, 0.02), eyeW);
+  eyeR.position.set(0.062, 0.046, 0.146);
+  head.add(eyeR);
+  const pupR = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.03, 0.018), eyeB);
+  pupR.position.set(0.062, 0.046, 0.158);
+  head.add(pupR);
+  const browL = new THREE.Mesh(new THREE.BoxGeometry(0.058, 0.02, 0.018), mkMat(0x8f5f3c));
+  browL.position.set(-0.062, 0.09, 0.135);
+  head.add(browL);
+  const browR = new THREE.Mesh(new THREE.BoxGeometry(0.058, 0.02, 0.018), mkMat(0x8f5f3c));
+  browR.position.set(0.062, 0.09, 0.135);
+  head.add(browR);
+  const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.028, 0.02), mkMat(0x8a5a42));
+  mouth.position.set(0, -0.065, 0.158);
+  head.add(mouth);
+
+  /* ---------- 帽子 + 帽檐 + 徽章 ---------- */
   const cap = new THREE.Mesh(
     new THREE.CylinderGeometry(0.17, 0.17, 0.06, 16),
     new THREE.MeshStandardMaterial({ color: 0x0a1525, roughness: 0.5, metalness: 0.04 })
   );
   cap.position.set(0, 1.76, 0.02);
-  g.add(cap);
-
-  /* ---------- 帽檐 ---------- */
+  body.add(cap);
   const brim = new THREE.Mesh(
     new THREE.BoxGeometry(0.22, 0.02, 0.18),
     new THREE.MeshStandardMaterial({ color: 0x050c18, roughness: 0.5, metalness: 0.04 })
   );
   brim.position.set(0, 1.73, 0.13);
-  g.add(brim);
-
-  /* ---------- 徽章 ---------- */
+  body.add(brim);
   const badge = new THREE.Mesh(
     new THREE.CylinderGeometry(0.02, 0.02, 0.01, 8),
     new THREE.MeshStandardMaterial({ color: stripec, roughness: 0.3, metalness: 0.8 })
   );
   badge.rotation.x = Math.PI / 2;
   badge.position.set(0, 1.76, 0.15);
-  g.add(badge);
+  body.add(badge);
+
+  /* ---------- 摆腿：大腿 + 小腿 + 鞋 ---------- */
+  function makeLeg(side){
+    const leg = new THREE.Group();
+    leg.position.set(side * 0.115, 0.60, 0);
+    const th = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.30, 0.16), mkMat(pants));
+    th.position.y = -0.15;
+    leg.add(th);
+    const sh = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.28, 0.14), mkMat(pants));
+    sh.position.y = -0.44;
+    leg.add(sh);
+    const boot = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.09, 0.24), mkMat(0x0b0b0d));
+    boot.position.set(0, -0.575, 0.03);
+    leg.add(boot);
+    return leg;
+  }
+  const legL = makeLeg(-1);
+  const legR = makeLeg(1);
+  g.add(legL);
+  g.add(legR);
 
   /* ---------- 头顶警告灯 ---------- */
   const warnLight = new THREE.Mesh(
@@ -526,7 +581,7 @@ function buildSecurityGuard(x, z, type, parent){
     new THREE.MeshBasicMaterial({ color: 0xff3333 })
   );
   warnLight.position.set(0, 1.84, 0.02);
-  g.add(warnLight);
+  body.add(warnLight);
 
   /* 加法混合的红色光晕：配合点光源与拖影，就是"红灯拖影"的主角 */
   const glow = new THREE.Mesh(
@@ -537,13 +592,13 @@ function buildSecurityGuard(x, z, type, parent){
     })
   );
   glow.position.set(0, 1.84, 0.02);
-  g.add(glow);
+  body.add(glow);
 
   addContactShadow(g, 0.58);
 
   return {
     group: g, armL, armR, head, warnLight,
-    glow,
+    glow, legL, legR, body,
     phase: Math.random() * Math.PI * 2
   };
 }
