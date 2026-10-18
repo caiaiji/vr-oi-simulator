@@ -117,9 +117,15 @@ function killGuard(g, dmg, kb){
     return true;
   }
   g.userData.alive = false;
-  /* 先炸散再移除组：部件已摘到场景里，带物理飞走 */
-  spawnBodyDebris(g.group, { speed: 3.9 + kb });
-  if (g.group.parent) g.group.parent.remove(g.group);
+  if (g.isGLTF || (g.userData && g.userData.isGLTF)){
+    /* 骨架模型不能拆部件：改播仰倒动画，由 updateGuards 收尾 */
+    g.userData.dying = true;
+    g.userData.dieT = 0;
+  } else {
+    /* 先炸散再移除组：部件已摘到场景里，带物理飞走 */
+    spawnBodyDebris(g.group, { speed: 3.9 + kb });
+    if (g.group.parent) g.group.parent.remove(g.group);
+  }
   state.guardKills++;
   /* 连击 / 飘字 / 掉落补给 */
   if (typeof arcadeHookKill === 'function') arcadeHookKill(g);
@@ -258,6 +264,18 @@ function updateGuards(realDt, t){
 
   for (let i = 0; i < securityGuards.length; i++){
     const g = securityGuards[i];
+    /* GLTF 骨架保安：阵亡播放仰倒+下沉，不炸散部件 */
+    if (g.userData.dying){
+      g.userData.dieT = (g.userData.dieT || 0) + realDt;
+      const dk = Math.min(1, g.userData.dieT / 0.9);
+      g.group.rotation.x = -dk * 1.35 + Math.sin(g.userData.dieT * 26) * dk * 0.05;
+      g.group.position.y = -dk * 0.14;
+      if (g.userData.dieT > 1.3){
+        if (g.group.parent) g.group.parent.remove(g.group);
+        g.userData.dying = false;   /* 倒地动画结束，允许 prune 回收 */
+      }
+      continue;
+    }
     if (!g.userData.alive) continue;
     /* 竞技场登场硬直：现形后 0.9 秒内不移动不攻击，防止刷脸上秒抓 */
     if (g.userData.spawnT > 0){ g.userData.spawnT -= realDt; continue; }

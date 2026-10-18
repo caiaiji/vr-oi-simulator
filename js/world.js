@@ -443,7 +443,7 @@ function buildPerson(x, z, shirtColor, rotY, startPose){
            phase: Math.random() * Math.PI * 2 };
 }
 
-function buildSecurityGuard(x, z, type, parent){
+function buildSecurityGuardBox(x, z, type, parent){
   type = type || 'normal';
   const g = new THREE.Group();
   g.position.set(x, 0, z);
@@ -736,7 +736,8 @@ function aliveGuardCount(){
 /* 清理已死亡的保安，防止数组无限增长导致每帧遍历膨胀 */
 function pruneDeadGuards(){
   for (let i = securityGuards.length - 1; i >= 0; i--){
-    if (!securityGuards[i].userData.alive) securityGuards.splice(i, 1);
+    const g = securityGuards[i];
+    if (!g.userData.alive && !g.userData.dying) securityGuards.splice(i, 1);
   }
 }
 
