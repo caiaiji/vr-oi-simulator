@@ -253,8 +253,30 @@ function punchGuardsArc(){
 /* =========================================================
    保安 AI + 碰撞
    ========================================================= */
+function advanceDyingGuard(g, realDt){
+  g.userData.dieT = (g.userData.dieT || 0) + realDt;
+  const dk = Math.min(1, g.userData.dieT / 0.9);
+  /* 后仰角限制在 1.5 内（脚底 pivot 再大就头入地）；平躺即止 */
+  g.group.rotation.x = -dk * 1.5 + Math.sin(g.userData.dieT * 26) * dk * 0.04;
+  /* 倒地后整身沉入地面下 2m，连人带手全消失，不留“露头”残像 */
+  const sink = Math.max(0, dk - 0.45) / 0.55;
+  g.group.position.y = -dk * 0.08 - sink * 1.9;
+  if (g.userData.dieT > 1.3){
+    if (g.group.parent) g.group.parent.remove(g.group);
+    g.userData.dying = false;   /* 倒地动画结束，允许 prune 回收 */
+    return true;
+  }
+  return false;
+}
+
 function updateGuards(realDt, t){
-  if (state.ended || state.frozen || state.view !== 'world') return;
+  if (state.ended || state.frozen) return;
+  /* 死亡动画在任何视图下都要演完并移除：切进草稿纸/IDE/上厕所
+     再回来也不会留下卡在倒塌姿态里的“埋地鬼” */
+  for (let di = securityGuards.length - 1; di >= 0; di--){
+    if (securityGuards[di].userData.dying) advanceDyingGuard(securityGuards[di], realDt);
+  }
+  if (state.view !== 'world') return;
 
   let minDist = Infinity;
   nearestGuardDist = Infinity;
@@ -264,18 +286,8 @@ function updateGuards(realDt, t){
 
   for (let i = 0; i < securityGuards.length; i++){
     const g = securityGuards[i];
-    /* GLTF 骨架保安：阵亡播放仰倒+下沉，不炸散部件 */
-    if (g.userData.dying){
-      g.userData.dieT = (g.userData.dieT || 0) + realDt;
-      const dk = Math.min(1, g.userData.dieT / 0.9);
-      g.group.rotation.x = -dk * 1.35 + Math.sin(g.userData.dieT * 26) * dk * 0.05;
-      g.group.position.y = -dk * 0.14;
-      if (g.userData.dieT > 1.3){
-        if (g.group.parent) g.group.parent.remove(g.group);
-        g.userData.dying = false;   /* 倒地动画结束，允许 prune 回收 */
-      }
-      continue;
-    }
+    /* GLTF 骨架保安：倒地+沉没动画已在 updateGuards 开头统一推进 */
+    if (g.userData.dying) continue;
     if (!g.userData.alive) continue;
     /* 竞技场登场硬直：现形后 0.9 秒内不移动不攻击，防止刷脸上秒抓 */
     if (g.userData.spawnT > 0){ g.userData.spawnT -= realDt; continue; }
