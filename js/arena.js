@@ -86,7 +86,7 @@ function spawnArenaGuards(n){
 function buildArena(){
   arenaScene = new THREE.Scene();
   arenaScene.background = new THREE.Color(0x120608);
-  arenaScene.fog = new THREE.FogExp2(0x120608, 0.022);
+  arenaScene.fog = new THREE.FogExp2(0x120608, 0.012);
 
   /* 地面：外圈血污平台 */
   const floor = new THREE.Mesh(
@@ -214,6 +214,9 @@ function enterArena(){
     if (weaponView.parent) weaponView.parent.remove(weaponView);
     arenaScene.add(weaponView);
   }
+
+  /* 画面复位：教室里的血腥记忆不带进竞技场，一眼回到刚进游戏 */
+  tension = 0;
 
   /* ---- HUD 与开场 ---- */
   arenaWave = 0;

@@ -474,7 +474,8 @@ function animate(){
     updateGuards(worldDt, t);
 
     /* 紧张值：随击倒数与贴身程度上升，坐定可回落 */
-    updateTension(worldDt, state.guardKills, nearestGuardDist, lastMoveSpeed);
+    updateTension(worldDt, state.arenaMode ? 0 : state.guardKills,
+                  nearestGuardDist, lastMoveSpeed);
 
     /* 走动警告检测 */
     if (state.started && !state.ended && !state.frozen
