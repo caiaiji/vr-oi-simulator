@@ -16,6 +16,7 @@ const ARENA_WAVE_MAX = 14;                /* 单波人数上限 */
 let arenaScene = null;
 let arenaWave = 0;            /* 当前波次（0 = 尚未开场） */
 let arenaAlive = 0;           /* 本波存活保安数 */
+let arenaBossKills = 0;       /* 校长被 KO 次数：决定下个 BOSS 波的强度/波位 */
 let arenaKills = 0;           /* 竞技场累计击杀 */
 let arenaWavePending = false; /* 下一波正在倒数，防重复触发 */
 
@@ -43,16 +44,22 @@ function arenaGuardSpeed(w, type){
   const waveMul = 1 + Math.min(1.0, (w - 1) * 0.09);
   if (type === 'heavy') return 0.55 * Math.min(1.5, waveMul);
   if (type === 'fast')  return 1.45 * Math.min(1.6, waveMul);
+  if (type === 'prefect') return 1.75 * Math.min(1.9, waveMul);   /* 风纪委员：贴脸猛追 */
+  if (type === 'director') return 0.42 * Math.min(1.2, waveMul);  /* 年级组长：重甲踱步 */
   return 0.95 * waveMul;
 }
 
 /* 竞技场种类掷骰：波次越高，重装 / 快速越常见 */
 function arenaGuardType(){
   const r = Math.random();
-  const heavyP = Math.min(0.28, 0.07 + arenaWave * 0.02);
-  const fastP  = Math.min(0.45, 0.22 + arenaWave * 0.025);
+  const heavyP = Math.min(0.26, 0.07 + arenaWave * 0.02);
+  const fastP  = Math.min(0.42, 0.22 + arenaWave * 0.022);
+  const prefectP = arenaWave >= 4 ? Math.min(0.28, 0.10 + arenaWave * 0.02) : 0;
+  const directorP = arenaWave >= 6 ? Math.min(0.20, 0.06 + arenaWave * 0.015) : 0;
   if (r < heavyP) return 'heavy';
   if (r < heavyP + fastP) return 'fast';
+  if (r < heavyP + fastP + prefectP) return 'prefect';
+  if (r < heavyP + fastP + prefectP + directorP) return 'director';
   return 'normal';
 }
 
@@ -89,7 +96,7 @@ function spawnArenaGuards(n){
       speed: arenaGuardSpeed(arenaWave, type),
       alive: true,
       type: type,
-      hp: type === 'heavy' ? 2 : 1,
+      hp: type === 'heavy' ? 2 : type === 'director' ? 3 : 1,
       spawnT: 0.9   /* 登场硬直：先亮个相，给玩家反应时间 */
     };
     securityGuards.push(g);
@@ -100,6 +107,57 @@ function spawnArenaGuards(n){
 /* =========================================================
    场景搭建
    ========================================================= */
+/* 每局随机 2~3 组掩体：讲台高台（可绕打）+ 翻倒桌椅（视线遮挡） */
+function spawnArenaProps(){
+  const groups = 2 + Math.floor(Math.random() * 2);
+  for (let i = 0; i < groups; i++){
+    const ang = Math.random() * Math.PI * 2;
+    const r = 4.2 + Math.random() * 4.2;
+    const px = clamp(Math.cos(ang) * r, -ARENA_HW + 2.6, ARENA_HW - 2.6);
+    const pz = clamp(Math.sin(ang) * r, -ARENA_HD + 2.6, ARENA_HD - 2.6);
+    if (Math.random() < 0.5){
+      /* 讲台高台：两级台阶 */
+      const g = new THREE.Group();
+      g.position.set(px, 0, pz);
+      box(2.7, 0.5, 2.0, 0x3f3134, 0, 0.25, 0, g, { roughness: 0.9 });
+      box(2.0, 0.5, 1.4, 0x4a3a3c, 1.35, 0.5, 0.3, g, { roughness: 0.9 });
+      const rail = mat(0x5a4a4c, { roughness: 0.7, metalness: 0.4 });
+      for (const [rx, rz] of [[0, -1.05], [0, 0.75], [1.05, 1.05], [-1.05, 1.05]]){
+        const post = new THREE.Mesh(getSphereGeo(0.09, 8, 6), rail);
+        post.position.set(rx, 0.78, rz);
+        g.add(post);
+      }
+      arenaScene.add(g);
+      const pl = new THREE.PointLight(0xffb060, 0.25, 9, 2);
+      pl.position.set(px, 1.5, pz);
+      arenaScene.add(pl);
+      addObstacle(px, pz, 1.6, 1.2);
+    } else {
+      /* 翻倒桌子：斜立的桌面 + 两条桌腿 */
+      const g = new THREE.Group();
+      g.position.set(px, 0, pz);
+      g.rotation.y = Math.random() * Math.PI;
+      const top = new THREE.Mesh(
+        new THREE.BoxGeometry(2.0, 0.14, 1.1),
+        mat(0x7a5a3c, { roughness: 0.85 })
+      );
+      top.position.set(0, 0.78, 0.28);
+      top.rotation.z = 1.35;
+      top.castShadow = true;
+      g.add(top);
+      const legM = mat(0x4a3524, { roughness: 0.8, metalness: 0.3 });
+      for (const [lx, lz] of [[-0.45, 0.5], [0.45, 0.5]]){
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.9, 0.14), legM);
+        leg.position.set(lx, 0.45, lz);
+        leg.rotation.z = 1.35;
+        g.add(leg);
+      }
+      arenaScene.add(g);
+      addObstacle(px, pz, 1.15, 0.85);
+    }
+  }
+}
+
 function buildArena(){
   arenaScene = new THREE.Scene();
   arenaScene.background = new THREE.Color(0x120608);
@@ -169,6 +227,9 @@ function buildArena(){
     arenaScene.add(c);
     addObstacle(cx, cz, 0.9, 0.9);
   }
+
+  /* 随机地形：讲台高台 / 翻倒桌椅围挡，每局不同 */
+  spawnArenaProps();
 
   /* 全局照明：环境光 + 半球光 + 主方向光（否则竞技场只有红警示灯，人物全黑） */
   arenaScene.add(new THREE.AmbientLight(0xfff1e8, 0.5));
@@ -246,6 +307,9 @@ function enterArena(){
   arenaWave = 0;
   arenaKills = 0;
   arenaAlive = 0;
+  arenaBossKills = 0;
+  const _bb = document.getElementById('bossBarWrap');
+  if (_bb) _bb.classList.add('hidden');
   updateArenaHud();
   const ah = $('arenaHud');
   if (ah) ah.classList.remove('hidden');
@@ -266,7 +330,16 @@ function startArenaWave(){
   arenaWave++;
   const n = arenaWaveSize(arenaWave);
   arenaAlive = n;
-  spawnArenaGuards(n);
+  /* 校长波：第 9 波首次登场，之后每 4 波带着更强形态回归 */
+  const bossWave = 9 + arenaBossKills * 4;
+  if (arenaWave === bossWave){
+    spawnPrincipalBoss();
+    const escorts = Math.max(2, Math.floor(n / 3));
+    spawnArenaGuards(escorts);   /* 校长带贴身护卫上场 */
+    arenaAlive = escorts + 1;
+  } else {
+    spawnArenaGuards(n);
+  }
   updateArenaHud();
   toast(`\u26A0 第 ${arenaWave} 波 · ${n} 名保安冲进竞技场！`, 2400);
   audio.beep(140, 0.4, 0.07, 'sawtooth');
@@ -280,8 +353,20 @@ function startArenaWave(){
 }
 
 /* killGuard 钩子：竞技场击杀计数与波次推进（combat.js 调用） */
-function arenaHookKill(){
+function arenaHookKill(g){
   if (!state.arenaMode) return;
+  /* 校长战败：加分 + 周目升级 + 血条隐去 */
+  if (g && g.userData && g.userData.type === 'principal'){
+    arenaBossKills++;
+    const bounty = 400 + (arenaBossKills - 1) * 150;
+    state.totalScore = (state.totalScore || 0) + bounty;
+    const bw = document.getElementById('bossBarWrap');
+    if (bw) bw.classList.add('hidden');
+    toast('\U0001F3C6 校长被 KO 了！第 ' + arenaBossKills + ' 形态击破，奖励 ' + bounty + ' 分。', 3600);
+    audio.beep(660, 0.15, 0.05, 'sine');
+    audio.beep(880, 0.3, 0.06, 'sine');
+    if (typeof unlockAch === 'function') unlockAch('arenaBoss');
+  }
   arenaKills++;
   arenaAlive = Math.max(0, arenaAlive - 1);
   updateArenaHud();
@@ -301,6 +386,74 @@ function arenaHookKill(){
       }, 1500);
     }, 1000);
   }
+}
+
+/* ---------- 校长 BOSS ---------- */
+
+function ensureBossBar(){
+  if (document.getElementById('bossBarWrap')) return;
+  const w = document.createElement('div');
+  w.id = 'bossBarWrap';
+  w.style.cssText = 'position:fixed;top:92px;left:50%;transform:translateX(-50%);width:min(70%,520px);z-index:60;';
+  const name = document.createElement('div');
+  name.id = 'bossName';
+  name.style.cssText = 'color:#ffe08a;font-weight:bold;text-align:center;margin-bottom:4px;font-size:15px;letter-spacing:1px;text-shadow:0 0 10px #a33;';
+  const bar = document.createElement('div');
+  bar.style.cssText = 'height:14px;background:#2a1216;border-radius:8px;border:2px solid #7a3340;overflow:hidden;';
+  const fill = document.createElement('div');
+  fill.id = 'bossBarFill';
+  fill.style.cssText = 'height:100%;width:100%;background:linear-gradient(90deg,#ffb020,#ff4d30);transition:width .15s;';
+  bar.appendChild(fill);
+  w.appendChild(name);
+  w.appendChild(bar);
+  document.body.appendChild(w);
+}
+
+function updateBossBar(hp, max){
+  const f = document.getElementById('bossBarFill');
+  if (f) f.style.width = Math.max(0, hp / max * 100) + '%';
+}
+
+function spawnPrincipalBoss(){
+  pruneDeadGuards();
+  /* 出生点反重叠：随机地形（高台/翻桌）不能把校长吸进障碍里 */
+  let bx = 0, bz = 0;
+  for (let t = 0; t < 14; t++){
+    const ang = Math.random() * Math.PI * 2;
+    const cx = clamp(8.4 * Math.cos(ang), -ARENA_HW + 2.5, ARENA_HW - 2.5);
+    const cz = clamp(8.4 * Math.sin(ang), -ARENA_HD + 2.5, ARENA_HD - 2.5);
+    if (!collides(cx, cz, 1.0)){ bx = cx; bz = cz; break; }
+    if (t === 0){ bx = cx; bz = cz; }   /* 全是障碍时保留第一个点，交给绕行 */
+  }
+  const g = buildSecurityGuard(bx, bz, 'director', arenaScene);
+  const form = arenaBossKills + 1;
+  g.group.scale.setScalar(2.2 + (form - 1) * 0.12);
+  g.userData = {
+    speed: 0.8 + (form - 1) * 0.04,
+    alive: true, type: 'principal',
+    hp: 14 + (form - 1) * 6,
+    hpMax: 14 + (form - 1) * 6,
+    spawnT: 1.3, boss: true,
+    stompCd: 3.0, dashCd: 6.0,
+    bState: 'idle', bT: 0
+  };
+  if (g.glow){
+    g.glow.material.color.set(0xffc400);
+    g.glow.material.opacity = 0.55;
+    g.glow.scale.setScalar((2.2 + (form - 1) * 0.12) * 1.3);
+  }
+  securityGuards.push(g);
+  state.guardsSpawned = (state.guardsSpawned || 0) + 1;
+
+  ensureBossBar();
+  const bw = document.getElementById('bossBarWrap');
+  if (bw) bw.classList.remove('hidden');
+  const bn = document.getElementById('bossName');
+  if (bn) bn.textContent = '校长 · 第 ' + form + ' 形态 · 抚顶 OA';
+  updateBossBar(g.userData.hp, g.userData.hpMax);
+  toast('\U0001F454 校长亲自下场了！踩水跺脚、直线冲刺都是死穴。', 3000);
+  audio.beep(170, 0.5, 0.07, 'sawtooth');
+  audio.beep(92, 0.8, 0.07, 'sawtooth');
 }
 
 function updateArenaHud(){

@@ -113,6 +113,9 @@ function killGuard(g, dmg, kb){
   const hp = g.userData.hp || 1;
   if (hp > dmg){
     g.userData.hp = hp - dmg;
+    if (g.userData.type === 'principal' && typeof updateBossBar === 'function'){
+      updateBossBar(g.userData.hp, g.userData.hpMax);
+    }
     if (typeof staggerGuard === 'function') staggerGuard(g, dmg >= 2);
     return true;
   }
@@ -135,7 +138,7 @@ function killGuard(g, dmg, kb){
   }
   /* 竞技场不分名额、不打补员：波次推进交给 arena.js 的钩子 */
   if (state.arenaMode && typeof arenaHookKill === 'function'){
-    arenaHookKill();
+    arenaHookKill(g);
   }
   /* 教室：每倒一名补一批替补（近战 AOE / 投掷等所有击杀路径统一补员） */
   if (!state.arenaMode && typeof spawnTwoGuards === 'function'){
@@ -269,6 +272,122 @@ function advanceDyingGuard(g, realDt){
   return false;
 }
 
+/* ============ 校长 BOSS 特殊 AI ============ */
+function bossSkillUpdate(g, realDt){
+  const ud = g.userData;
+  ud.bT += realDt;
+  if (ud.bState === 'idle'){
+    ud.stompCd -= realDt;
+    ud.dashCd -= realDt;
+    const d = Math.hypot(state.pos.x - g.group.position.x, state.pos.z - g.group.position.z);
+    if (ud.stompCd <= 0 && d < 5.4){
+      ud.bState = 'stompTelegraph'; ud.bT = 0;
+      audio.beep(96, 0.5, 0.09, 'square');
+    } else if (ud.dashCd <= 0 && d > 4.0){
+      ud.bState = 'dashTelegraph'; ud.bT = 0;
+      audio.beep(230, 0.35, 0.06, 'square');
+    } else if (ud.stompCd <= 0){ ud.stompCd = 0.5; }
+    else if (ud.dashCd <= 0){ ud.dashCd = 0.5; }
+  } else if (ud.bState === 'stompTelegraph'){
+    /* 蓄力跺脚：脚下红光聚集 0.7s */
+    if (ud.bT > 0.7){
+      ud.bState = 'idle'; ud.bT = 0; ud.stompCd = 6.5;
+      bossStomp(g);
+    }
+  } else if (ud.bState === 'dashTelegraph'){
+    /* 蓄力冲刺：0.6s 瞄准玩家后直线撞出 */
+    if (ud.bT > 0.6){
+      ud.bState = 'dash'; ud.bT = 0;
+      const ddx = state.pos.x - g.group.position.x;
+      const ddz = state.pos.z - g.group.position.z;
+      const dd = Math.hypot(ddx, ddz) || 1;
+      ud.dashDx = ddx / dd; ud.dashDz = ddz / dd;
+      audio.beep(330, 0.3, 0.05, 'sawtooth');
+    }
+  } else if (ud.bState === 'dash'){
+    if (ud.bT > 0.85){ ud.bState = 'dazed'; ud.bT = 0; }
+  } else if (ud.bState === 'dazed'){
+    /* 冲刺撞空后的 0.9s 踉跄硬直：输出的机会 */
+    if (ud.bT > 0.9){ ud.bState = 'idle'; ud.bT = 0; }
+  }
+  /* 蓄力视觉：光晕变色 + 呼吸脉冲，玩家一眼看出要出招了 */
+  if (g.glow){
+    const pulse = 0.55 + Math.sin(ud.bT * 22) * 0.2;
+    if (ud.bState === 'stompTelegraph'){
+      g.glow.material.color.set(0xff2222);
+      g.glow.material.opacity = pulse;
+    } else if (ud.bState === 'dashTelegraph'){
+      g.glow.material.color.set(0x66e0ff);
+      g.glow.material.opacity = pulse;
+    } else {
+      g.glow.material.color.set(0xffc400);
+      g.glow.material.opacity = 0.55;
+    }
+  }
+}
+
+function bossStomp(g){
+  const dx = state.pos.x - g.group.position.x;
+  const dz = state.pos.z - g.group.position.z;
+  const d = Math.hypot(dx, dz) || 1;
+  /* 冲击波视觉：地面震裂环 + 飞散碎块 */
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.6, 0.95, 40),
+    new THREE.MeshBasicMaterial({ color: 0xff4d30, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(g.group.position.x, 0.06, g.group.position.z);
+  arenaScene.add(ring);
+  setTimeout(() => { if (ring.parent) ring.parent.remove(ring); }, 550);
+  for (let i = 0; i < 16; i++){
+    const chunk = new THREE.Mesh(
+      new THREE.BoxGeometry(0.16, 0.1, 0.16),
+      new THREE.MeshBasicMaterial({ color: 0x6a3a30 })
+    );
+    const a = Math.random() * Math.PI * 2;
+    chunk.position.set(g.group.position.x + Math.cos(a) * 2.1, 0.08, g.group.position.z + Math.sin(a) * 2.1);
+    arenaScene.add(chunk);
+    setTimeout(() => { if (chunk.parent) chunk.parent.remove(chunk); }, 420);
+  }
+  if (d < 4.8){
+    if (state.worldTime - state.lastDamageAt >= PLAYER_HURT_INVULN / 1000){
+      state.lastDamageAt = state.worldTime;
+      if (!damagePlayer(g, state.worldTime)){ endByGuards(); return; }
+    }
+    /* 击退：把玩家掀开 3m */
+    const nx = state.pos.x + (dx / d) * 3.0;
+    const nz = state.pos.z + (dz / d) * 3.0;
+    if (!collides(nx, state.pos.z, 0.3)) state.pos.x = nx;
+    if (!collides(state.pos.x, nz, 0.3)) state.pos.z = nz;
+  }
+  audio.beep(58, 0.55, 0.12, 'sawtooth');
+}
+
+function bossDashMove(g, realDt){
+  const ud = g.userData;
+  const v = 6.8 * realDt;
+  const nx = g.group.position.x + ud.dashDx * v;
+  const nz = g.group.position.z + ud.dashDz * v;
+  const bx = collides(nx, g.group.position.z, 0.45);
+  const bz = collides(g.group.position.x, nz, 0.45);
+  /* 撞障碍物：提前收招，进入踉跄硬直（否则撞墙干站） */
+  if (bx && bz){
+    ud.bState = 'dazed'; ud.bT = 0;
+    audio.beep(90, 0.2, 0.07, 'square');
+    return;
+  }
+  if (!bx) g.group.position.x = nx;
+  if (!bz) g.group.position.z = nz;
+  if (Math.hypot(state.pos.x - g.group.position.x, state.pos.z - g.group.position.z) < 1.15){
+    if (state.worldTime - state.lastDamageAt >= PLAYER_HURT_INVULN / 1000){
+      state.lastDamageAt = state.worldTime;
+      if (!damagePlayer(g, state.worldTime)){ endByGuards(); return; }
+    }
+    ud.bState = 'dazed'; ud.bT = 0;
+    audio.beep(120, 0.4, 0.08, 'square');
+  }
+}
+
 function updateGuards(realDt, t){
   if (state.ended || state.frozen) return;
   /* 死亡动画在任何视图下都要演完并移除：切进草稿纸/IDE/上厕所
@@ -291,6 +410,7 @@ function updateGuards(realDt, t){
     if (!g.userData.alive) continue;
     /* 竞技场登场硬直：现形后 0.9 秒内不移动不攻击，防止刷脸上秒抓 */
     if (g.userData.spawnT > 0){ g.userData.spawnT -= realDt; continue; }
+    if (g.userData.boss) bossSkillUpdate(g, realDt);
 
     const pos = g.group.position;
     const dx = state.pos.x - pos.x;
@@ -306,7 +426,11 @@ function updateGuards(realDt, t){
     }
 
     if (d > 0.01){
-      const sp = g.userData.speed * realDt;
+      let sp = g.userData.speed * realDt;
+      if (g.userData.boss){
+        if (g.userData.bState === 'dash') bossDashMove(g, realDt);
+        if (g.userData.bState !== 'idle') sp = 0;   /* 蓄力/硬直/冲刺期间站定 */
+      }
       let nx = pos.x + (dx / d) * sp;
       let nz = pos.z + (dz / d) * sp;
       /* 竞技场绕障：直行被挡就选定一侧坚定绕行，不顶墙罚站也不来回抖 */

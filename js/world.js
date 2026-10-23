@@ -456,7 +456,12 @@ function buildPersonGuard(x, z, type, parent){
   let uniform = 0x2a4a72, glowc = 0xff4444;
   if (type === 'heavy'){ uniform = 0x5a262e; glowc = 0xff6a33; }
   else if (type === 'fast'){ uniform = 0x2c4722; glowc = 0xffb020; }
-  g.scale.setScalar(type === 'heavy' ? 1.16 : type === 'fast' ? 0.95 : 1);
+  else if (type === 'prefect'){ uniform = 0xc9a227; glowc = 0xffe14d; }   /* 风纪委员：金臂章 */
+  else if (type === 'director'){ uniform = 0x41205e; glowc = 0xa55cff; }  /* 年级组长：紫红西装 */
+  g.scale.setScalar(
+    type === 'heavy' ? 1.16 : type === 'fast' ? 0.95 :
+    type === 'prefect' ? 1.05 : type === 'director' ? 1.35 : 1
+  );
 
   const mat = (c, rough) => new THREE.MeshStandardMaterial({
     color: c, roughness: rough == null ? 0.85 : rough, metalness: 0.05
